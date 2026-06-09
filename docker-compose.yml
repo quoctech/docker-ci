@@ -1,0 +1,86 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ci4_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./docker/php/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini
+      - ./docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf
+    networks:
+      - ci4_network
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:alpine
+    container_name: ci4_nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - ci4_network
+    depends_on:
+      - app
+
+  node:
+    build:
+      context: .
+      dockerfile: docker/node/Dockerfile
+    container_name: ci4_node
+    restart: unless-stopped
+    working_dir: /var/www/node
+    volumes:
+      - ./node:/var/www/node
+      - node_modules:/var/www/node/node_modules
+    ports:
+      - "3000:3000"
+    command: ["node", "--watch", "server.js"]
+    networks:
+      - ci4_network
+    depends_on:
+      - db
+
+  redis:
+    image: redis:alpine
+    container_name: ci4_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ci4_network
+
+  db:
+    image: mariadb:11
+    container_name: ci4_db
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: ci4_db
+      MARIADB_USER: ci4_user
+      MARIADB_PASSWORD: ci4_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d
+    networks:
+      - ci4_network
+
+networks:
+  ci4_network:
+    driver: bridge
+
+volumes:
+  db_data:
+  node_modules:
+  redis_data:

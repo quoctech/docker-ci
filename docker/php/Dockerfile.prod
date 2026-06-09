@@ -1,0 +1,74 @@
+# =============================================================================
+# Stage 1: Install dependencies
+# =============================================================================
+FROM composer:latest AS vendor
+
+WORKDIR /app
+
+COPY src/composer.json src/composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-scripts \
+    --prefer-dist \
+    --optimize-autoloader \
+    --ignore-platform-reqs
+
+# =============================================================================
+# Stage 2: Production PHP-FPM
+# =============================================================================
+FROM php:8.5-fpm-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    libzip-dev \
+    icu-dev \
+    oniguruma-dev \
+    libxml2-dev \
+    linux-headers \
+    $PHPIZE_DEPS
+
+# Configure and install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+RUN docker-php-ext-install pdo_mysql
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-install mbstring
+RUN docker-php-ext-install exif
+RUN docker-php-ext-install pcntl
+RUN docker-php-ext-install bcmath
+RUN docker-php-ext-install gd
+RUN docker-php-ext-install zip
+RUN docker-php-ext-install intl
+
+# Cleanup build deps
+RUN apk del $PHPIZE_DEPS linux-headers \
+    && rm -rf /var/cache/apk/*
+
+# Copy PHP configs
+COPY docker/php/prod.ini /usr/local/etc/php/conf.d/prod.ini
+COPY docker/php/opcache.prod.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY docker/php/www.prod.conf /usr/local/etc/php-fpm.d/www.conf
+
+# Create log directory
+RUN mkdir -p /var/log/php && chown www-data:www-data /var/log/php
+
+# Copy application code
+COPY --chown=www-data:www-data src/ /var/www/html/
+
+# Copy vendor from stage 1
+COPY --from=vendor /app/vendor /var/www/html/vendor
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/writable
+
+USER www-data
+
+WORKDIR /var/www/html
+
+EXPOSE 9000
+CMD ["php-fpm"]
