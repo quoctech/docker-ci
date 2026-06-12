@@ -2,7 +2,7 @@
 
 ## 📌 Tổng Quan Dự Án
 Là nền tảng giáo dục game hóa bám sát chương trình Sách giáo khoa (Toán, Văn, Anh) từ lớp 1 đến lớp 9. Hệ thống tối ưu hóa chi phí bằng cách quét PDF (Sách giáo khoa) SGK và cache cấu trúc game JSON thông qua AI đúng 1 lần duy nhất. 
-Dự án được phát triển theo tư duy **Backend-First**, kiến trúc hệ thống dạng **Pluggable Modules** (Bật/Tắt, cài/gỡ linh hoạt thông qua Admin Master), chạy trên hạ tầng Docker (PHP 8.5, Nginx, Redis, MariaDB, Node.js).
+Dự án được phát triển theo tư duy **Backend-First**, kiến trúc hệ thống dạng **Pluggable Modules** (Bật/Tắt, cài/gỡ linh hoạt thông qua Admin Master), các module nằm trong thư mục modules, chạy trên hạ tầng Docker (PHP 8.5, Nginx, Redis, MariaDB, Node.js).
 
 ---
 

@@ -77,3 +77,47 @@ defined('EXIT_USER_INPUT')     || define('EXIT_USER_INPUT', 7);     // invalid u
 defined('EXIT_DATABASE')       || define('EXIT_DATABASE', 8);       // database error
 defined('EXIT__AUTO_MIN')      || define('EXIT__AUTO_MIN', 9);      // lowest automatically-assigned error code
 defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125);    // highest automatically-assigned error code
+
+/*
+ |--------------------------------------------------------------------------
+ | Application Constants
+ |--------------------------------------------------------------------------
+ |
+ | Hằng số riêng của EduGame Platform.
+ | Tập trung giá trị lặp lại để dễ thay đổi và tránh magic strings.
+ |
+ */
+
+// --- Datetime Format ---
+defined('APP_DATETIME_FORMAT') || define('APP_DATETIME_FORMAT', 'Y-m-d H:i:s');
+
+// --- Password Hashing (Argon2id) ---
+defined('APP_HASH_MEMORY_COST') || define('APP_HASH_MEMORY_COST', 65536); // 64MB
+defined('APP_HASH_TIME_COST')   || define('APP_HASH_TIME_COST', 4);
+defined('APP_HASH_THREADS')     || define('APP_HASH_THREADS', 3);
+
+// --- User Roles (RBAC) ---
+defined('ROLE_SUPER_ADMIN')    || define('ROLE_SUPER_ADMIN', 'super_admin');
+defined('ROLE_WORKSPACE_ADMIN') || define('ROLE_WORKSPACE_ADMIN', 'workspace_admin');
+defined('ROLE_USER')           || define('ROLE_USER', 'user');
+
+// --- User Status ---
+defined('STATUS_ACTIVE')  || define('STATUS_ACTIVE', 'active');
+defined('STATUS_LOCKED')  || define('STATUS_LOCKED', 'locked');
+defined('STATUS_PENDING') || define('STATUS_PENDING', 'pending');
+
+// --- Security: Brute Force ---
+defined('MAX_LOGIN_ATTEMPTS')    || define('MAX_LOGIN_ATTEMPTS', 5);
+defined('LOCK_DURATION_MINUTES') || define('LOCK_DURATION_MINUTES', 30);
+defined('LOGIN_RATE_LIMIT')      || define('LOGIN_RATE_LIMIT', 10);       // requests per window
+defined('LOGIN_RATE_WINDOW')     || define('LOGIN_RATE_WINDOW', 60);      // seconds
+defined('REGISTER_RATE_LIMIT')   || define('REGISTER_RATE_LIMIT', 1);
+defined('REGISTER_RATE_WINDOW')  || define('REGISTER_RATE_WINDOW', 5);
+
+// --- Redis Key Prefixes ---
+defined('REDIS_PREFIX_BLACKLIST')  || define('REDIS_PREFIX_BLACKLIST', 'jwt:blacklist:');
+defined('REDIS_PREFIX_SESSION')    || define('REDIS_PREFIX_SESSION', 'session:user:');
+defined('REDIS_PREFIX_LOGIN')      || define('REDIS_PREFIX_LOGIN', 'login:attempts:');
+defined('REDIS_PREFIX_RATE')       || define('REDIS_PREFIX_RATE', 'rate:');
+defined('REDIS_KEY_MODULES')      || define('REDIS_KEY_MODULES', 'modules:status');
+defined('REDIS_KEY_SITE_CONFIG')  || define('REDIS_KEY_SITE_CONFIG', 'site:config');
