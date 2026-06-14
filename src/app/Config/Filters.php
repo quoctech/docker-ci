@@ -18,6 +18,7 @@ use Modules\Auth\Filters\SecurityHeadersFilter;
 use Modules\Auth\Filters\ModuleCheckFilter;
 use Modules\Auth\Filters\ModuleRedirectFilter;
 use Modules\VortexEngine\Filters\SubscriptionFilter;
+use App\Filters\LogApiErrorsFilter;
 
 class Filters extends BaseFilters
 {
@@ -40,6 +41,7 @@ class Filters extends BaseFilters
         'module_check'    => ModuleCheckFilter::class,
         'module_redirect' => ModuleRedirectFilter::class,
         'subscription'    => SubscriptionFilter::class,
+        'log_api_errors'  => LogApiErrorsFilter::class,
     ];
 
     /**
@@ -80,5 +82,8 @@ class Filters extends BaseFilters
     /**
      * @var array<string, array<string, list<string>>>
      */
-    public array $filters = [];
+    public array $filters = [
+        // Log API errors (4xx/5xx) tự động vào system_logs
+        'log_api_errors' => ['after' => ['api/*']],
+    ];
 }

@@ -103,7 +103,7 @@
         <template x-if="scanned && uninstalled.length === 0">
             <div class="card" style="margin-top:24px">
                 <div class="card__body" style="text-align:center;color:var(--color-text-muted);font-size:13px;padding:24px">
-                    ✅ Tất cả module trong thư mục đã được cài đặt.
+                    Tất cả module trong thư mục đã được cài đặt.
                 </div>
             </div>
         </template>

@@ -398,7 +398,7 @@
                     <option :value="g" x-text="'Lớp ' + g"></option>
                 </template>
             </select>
-            <span class="filter-bar__count" x-text="'Tổng: ' + subPagination.total + ' bản ghi'"></span>
+            <span class="filter-bar__count" x-text="'Tổng đăng ký: ' + subPagination.total"></span>
         </div>
 
         <div class="card">
@@ -460,8 +460,7 @@
                     Chưa có dữ liệu.
                 </div>
                 <!-- Pagination -->
-                <div x-show="subPagination.total_pages > 1"
-                     style="padding:12px 20px;display:flex;justify-content:center;gap:4px;border-top:1px solid var(--color-border)">
+                <div x-show="subPagination.total_pages > 1" class="pagination-bar">
                     <button class="btn btn--ghost btn--sm"
                             @click="subGoPage(subPagination.page - 1)"
                             :disabled="subPagination.page <= 1">← Trước</button>

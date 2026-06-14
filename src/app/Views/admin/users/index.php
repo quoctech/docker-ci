@@ -43,7 +43,7 @@
                     <option :value="g" x-text="'Lớp ' + g"></option>
                 </template>
             </select>
-            <span class="filter-bar__count" x-text="'Tổng: ' + pagination.total + ' người dùng'"></span>
+            <span class="filter-bar__count" x-text="'Tổng người dùng: ' + pagination.total"></span>
         </div>
     </div>
 
@@ -119,7 +119,7 @@
             </div>
 
             <!-- Pagination -->
-            <div x-show="pagination.total_pages > 1" style="padding:12px 20px;display:flex;justify-content:center;gap:4px;border-top:1px solid var(--color-border)">
+            <div x-show="pagination.total_pages > 1" class="pagination-bar">
                 <button class="btn btn--ghost btn--sm" @click="goPage(pagination.page - 1)" :disabled="pagination.page <= 1">← Trước</button>
                 <span style="padding:6px 12px;font-size:13px" x-text="pagination.page + ' / ' + pagination.total_pages"></span>
                 <button class="btn btn--ghost btn--sm" @click="goPage(pagination.page + 1)" :disabled="pagination.page >= pagination.total_pages">Sau →</button>

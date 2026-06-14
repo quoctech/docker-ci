@@ -34,6 +34,9 @@ $currentUri = uri_string();
                 <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/modules') ? 'sidebar__nav-item--active' : '' ?>">
                     <a href="/admin/modules">🧩 Quản lý Module</a>
                 </li>
+                <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/system-logs') ? 'sidebar__nav-item--active' : '' ?>">
+                    <a href="/admin/system-logs">📋 System Log</a>
+                </li>
             </ul>
         </li>
 

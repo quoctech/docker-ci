@@ -77,4 +77,13 @@ class AdminPageController extends BaseController
     {
         return view('admin/subscriptions/index');
     }
+
+    /**
+     * GET /admin/system-logs
+     * Trang nhật ký hệ thống.
+     */
+    public function systemLogs(): string
+    {
+        return view('admin/system_logs/index');
+    }
 }

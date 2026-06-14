@@ -19,6 +19,7 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('users', '\Modules\SystemAdmin\Controllers\AdminPageController::users');
     $routes->get('profile', '\Modules\SystemAdmin\Controllers\AdminPageController::profile');
     $routes->get('subscriptions', '\Modules\SystemAdmin\Controllers\AdminPageController::subscriptions', ['filter' => 'module_redirect:vortex-engine']);
+    $routes->get('system-logs', '\Modules\SystemAdmin\Controllers\AdminPageController::systemLogs');
 });
 
 // Serve uploaded files (avatar)
@@ -79,6 +80,20 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
             $routes->put('packages/(:segment)/toggle', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::togglePackage/$1');
             $routes->put('packages/(:segment)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updatePackage/$1');
         });
+
+        // Server Status
+        $routes->get('server-status', '\Modules\SystemAdmin\Controllers\ServerStatusController::index');
+
+        // Search (Awesome Bar)
+        $routes->get('search', '\Modules\AwesomeBar\Controllers\AdminAwesomeBarController::search');
+
+        // System Log
+        $routes->get('system-logs/stats', '\Modules\SystemLog\Controllers\AdminSystemLogController::stats');
+        $routes->get('system-logs/(:num)', '\Modules\SystemLog\Controllers\AdminSystemLogController::show/$1');
+        $routes->get('system-logs', '\Modules\SystemLog\Controllers\AdminSystemLogController::index');
+        $routes->post('system-logs/mark-seen', '\Modules\SystemLog\Controllers\AdminSystemLogController::markAllSeen');
+        $routes->delete('system-logs/(:num)', '\Modules\SystemLog\Controllers\AdminSystemLogController::delete/$1');
+        $routes->delete('system-logs', '\Modules\SystemLog\Controllers\AdminSystemLogController::clearAll');
 
         // User Management
         $routes->get('users', '\Modules\SystemAdmin\Controllers\UserManagementController::index');
