@@ -47,6 +47,9 @@ class SiteConfigController extends ApiController
      */
     public function create(): ResponseInterface
     {
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getPost();
+
         $rules = [
             'key'         => 'required|alpha_dash|max_length[100]|is_unique[site_configs.key]',
             'value'       => 'permit_empty',
@@ -55,16 +58,16 @@ class SiteConfigController extends ApiController
             'description' => 'permit_empty|max_length[255]',
         ];
 
-        if (! $this->validate($rules)) {
+        if (! $this->validateData($input, $rules)) {
             return $this->error('Dữ liệu không hợp lệ.', 422, $this->validator->getErrors());
         }
 
         $this->configRepo->setValue(
-            $this->request->getVar('key'),
-            $this->request->getVar('value') ?? '',
-            $this->request->getVar('group') ?? 'general',
-            $this->request->getVar('type') ?? 'string',
-            $this->request->getVar('description')
+            $input['key'],
+            $input['value'] ?? '',
+            $input['group'] ?? 'general',
+            $input['type'] ?? 'string',
+            $input['description'] ?? null
         );
 
         return $this->success(null, 'Đã tạo cấu hình.', 201);
@@ -81,8 +84,10 @@ class SiteConfigController extends ApiController
             return $this->error('Cấu hình không tồn tại.', 404);
         }
 
-        $input = $this->request->getRawInput();
-        $value = $input['value'] ?? '';
+        // getRawInput() parse cả form-urlencoded lẫn JSON cho PUT request
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getRawInput();
+        $value  = $input['value'] ?? '';
 
         $this->configRepo->setValue($key, $value, $existing->group, $existing->type, $existing->description);
 

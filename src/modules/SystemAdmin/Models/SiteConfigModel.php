@@ -28,14 +28,21 @@ class SiteConfigModel extends Model
 
     /**
      * Get config value by key (Redis-cached).
+     *
+     * Cache lưu dạng JSON {"v":"...","t":"string"} để tránh query DB lấy type
+     * khi cache hit (trước đây là N+1: cache value nhưng vẫn SELECT type).
      */
     public function getValue(string $key, mixed $default = null): mixed
     {
-        $redis = RedisService::getInstance();
+        $redis  = RedisService::getInstance();
         $cached = $redis->hget(REDIS_KEY_SITE_CONFIG, $key);
 
         if ($cached !== null) {
-            return $this->castValue($cached, $this->getType($key));
+            $item = json_decode($cached, true);
+            if (is_array($item) && isset($item['v'], $item['t'])) {
+                return $this->castValue($item['v'], $item['t']);
+            }
+            // Stale entry (old plain-string format) → fall through to rebuild
         }
 
         $config = $this->where('key', $key)->first();
@@ -44,14 +51,17 @@ class SiteConfigModel extends Model
             return $default;
         }
 
-        $redis->hset(REDIS_KEY_SITE_CONFIG, $key, $config->value ?? '');
+        $redis->hset(REDIS_KEY_SITE_CONFIG, $key, json_encode([
+            'v' => $config->value ?? '',
+            't' => $config->type,
+        ]));
 
         return $this->castValue($config->value, $config->type);
     }
 
     /**
      * Ghi giá trị config vào DB + Redis.
-     * Nếu key đã tồn tại → update, chưa có → insert.
+     * Nếu key đã tồn tại → update (giữ nguyên type từ DB), chưa có → insert.
      */
     public function setValue(string $key, mixed $value, string $group = 'general', string $type = 'string', ?string $description = null): void
     {
@@ -61,9 +71,10 @@ class SiteConfigModel extends Model
 
         if ($existing) {
             $this->skipValidation(true)->update($existing->id, [
-                'value'       => $stringValue,
-                'updated_at'  => now_datetime(),
+                'value'      => $stringValue,
+                'updated_at' => now_datetime(),
             ]);
+            $type = $existing->type; // Luôn giữ type từ DB, tránh ghi sai type vào cache
         } else {
             $this->insert([
                 'key'         => $key,
@@ -75,8 +86,11 @@ class SiteConfigModel extends Model
             ]);
         }
 
-        // Đồng bộ Redis cache
-        RedisService::getInstance()->hset(REDIS_KEY_SITE_CONFIG, $key, $stringValue);
+        // Cache value + type cùng nhau → getValue() không cần query DB khi cache hit
+        RedisService::getInstance()->hset(REDIS_KEY_SITE_CONFIG, $key, json_encode([
+            'v' => $stringValue,
+            't' => $type,
+        ]));
     }
 
     /**
@@ -127,12 +141,4 @@ class SiteConfigModel extends Model
         };
     }
 
-    /**
-     * Get type for a config key.
-     */
-    private function getType(string $key): string
-    {
-        $config = $this->where('key', $key)->first();
-        return $config->type ?? 'string';
-    }
 }

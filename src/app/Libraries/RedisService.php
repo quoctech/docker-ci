@@ -213,28 +213,30 @@ class RedisService
      *
      * Ví dụ: rateLimit("login:192.168.1.1", 10, 60) → tối đa 10 request / 60 giây.
      *
-     * @param string $key          Key định danh (thường là "action:identifier")
-     * @param int    $maxRequests  Số request tối đa trong window
+     * LƯU Ý: INCR trước, kiểm tra sau — đảm bảo atomic, không có race condition.
+     * Pattern cũ (GET → check → INCR) có thể bị bypass khi 2 request đồng thời
+     * cùng đọc được giá trị dưới ngưỡng rồi cùng INCR qua giới hạn.
+     *
+     * @param string $key           Key định danh (thường là "action:identifier")
+     * @param int    $maxRequests   Số request tối đa trong window
      * @param int    $windowSeconds Kích thước window (giây)
-     * @return int Số request còn lại, hoặc -1 nếu đã vượt giới hạn
+     * @return int Số request còn lại (>= 0), hoặc -1 nếu đã vượt giới hạn
      */
     public static function rateLimit(string $key, int $maxRequests, int $windowSeconds): int
     {
         $redis    = self::getInstance();
         $cacheKey = REDIS_PREFIX_RATE . $key;
-        $current  = (int) $redis->get($cacheKey);
 
-        // Đã đạt giới hạn → reject
-        if ($current >= $maxRequests) {
-            return -1;
-        }
-
-        // Tăng counter
-        $count = $redis->incr($cacheKey);
+        // INCR là atomic trong Redis — không có race condition
+        $count = (int) $redis->incr($cacheKey);
 
         // Lần đầu tiên trong window → set TTL
         if ($count === 1) {
             $redis->expire($cacheKey, $windowSeconds);
+        }
+
+        if ($count > $maxRequests) {
+            return -1;
         }
 
         return $maxRequests - $count;
