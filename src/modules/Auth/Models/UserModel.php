@@ -32,6 +32,8 @@ class UserModel extends Model
         'full_name',               // Họ tên đầy đủ hiển thị
         'avatar',                  // Đường dẫn file avatar (relative path)
         'role',                    // Phân quyền: super_admin | workspace_admin | user
+        'grade',                   // Lớp học (1–9), chỉ dành cho học sinh (role=user)
+        'organization',            // Tổ chức / Trường, dành cho giáo viên (role=workspace_admin)
         'status',                  // Trạng thái: active | locked | pending
         'email_verified_at',       // Thời điểm xác minh email
         'last_login_at',           // Lần đăng nhập gần nhất

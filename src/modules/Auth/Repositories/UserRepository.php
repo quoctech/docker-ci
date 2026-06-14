@@ -125,6 +125,20 @@ class UserRepository
                     ->groupEnd();
         }
 
+        if (isset($filters['grade']) && $filters['grade'] !== null) {
+            $builder->where('grade', $filters['grade']);
+        }
+
+        if (! empty($filters['exclude_subscribed'])) {
+            // Loại học viên đang có subscription VIP hoặc TRIAL còn hạn
+            $builder->whereNotIn('uuid', function (\CodeIgniter\Database\BaseBuilder $sub) {
+                $sub->select('student_id')
+                    ->from('student_subscriptions')
+                    ->whereIn('status', ['VIP', 'TRIAL'])
+                    ->where('(expired_date IS NULL OR expired_date > NOW())', null, false);
+            });
+        }
+
         $total = $builder->countAllResults(false);
         $users = $builder->orderBy('created_at', 'DESC')
                          ->limit($perPage, ($page - 1) * $perPage)

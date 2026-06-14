@@ -55,7 +55,7 @@ class AdminSubscriptionController extends ApiController
         }
 
         try {
-            $sub = $this->repo->activate($studentId, $parentId, $packageKey, $package->days_to_add);
+            $sub = $this->repo->activate($studentId, $parentId, $packageKey, $package->days_to_add, $package->sub_type ?? 'VIP');
 
             return $this->success([
                 'subscription_id' => $sub->id,
@@ -101,25 +101,34 @@ class AdminSubscriptionController extends ApiController
         $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getPost();
 
         $rules = [
-            'package_key' => 'required|alpha_dash|max_length[50]|is_unique[packages.package_key]',
-            'name'        => 'required|max_length[100]',
-            'days_to_add' => 'required|integer|greater_than[0]',
-            'price'       => 'required|integer|greater_than_equal_to[0]',
-            'description' => 'permit_empty|max_length[255]',
+            'package_key'   => 'required|alpha_dash|max_length[50]|is_unique[packages.package_key]',
+            'name'          => 'required|max_length[100]',
+            'days_to_add'   => 'required|integer|greater_than[0]',
+            'price'         => 'required|integer|greater_than_equal_to[0]',
+            'description'   => 'permit_empty|max_length[255]',
+            'sub_type'      => 'permit_empty|in_list[VIP,TRIAL]',
+            'max_students'  => 'permit_empty|integer|greater_than[0]',
+            'allowed_grades'=> 'permit_empty',
         ];
 
         if (! $this->validateData($input, $rules)) {
             return $this->error('Dữ liệu không hợp lệ.', 422, $this->validator->getErrors());
         }
 
+        $gradesRaw = $input['allowed_grades'] ?? null;
+        $gradesJson = $this->normalizeGrades($gradesRaw);
+
         try {
             $pkg = $this->repo->createPackage([
-                'package_key' => strtoupper($input['package_key']),
-                'name'        => $input['name'],
-                'days_to_add' => (int) $input['days_to_add'],
-                'price'       => (int) $input['price'],
-                'description' => $input['description'] ?? null,
-                'is_active'   => 1,
+                'package_key'    => strtoupper($input['package_key']),
+                'name'           => $input['name'],
+                'days_to_add'    => (int) $input['days_to_add'],
+                'price'          => (int) $input['price'],
+                'description'    => $input['description'] ?? null,
+                'sub_type'       => in_array($input['sub_type'] ?? '', ['VIP', 'TRIAL']) ? $input['sub_type'] : 'VIP',
+                'max_students'   => isset($input['max_students']) ? (int) $input['max_students'] : 1,
+                'allowed_grades' => $gradesJson,
+                'is_active'      => 1,
             ]);
 
             return $this->success($pkg, 'Đã tạo gói học.', 201);
@@ -146,10 +155,13 @@ class AdminSubscriptionController extends ApiController
         $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getRawInput();
 
         $rules = [
-            'name'        => 'permit_empty|max_length[100]',
-            'days_to_add' => 'permit_empty|integer|greater_than[0]',
-            'price'       => 'permit_empty|integer|greater_than_equal_to[0]',
-            'description' => 'permit_empty|max_length[255]',
+            'name'           => 'permit_empty|max_length[100]',
+            'days_to_add'    => 'permit_empty|integer|greater_than[0]',
+            'price'          => 'permit_empty|integer|greater_than_equal_to[0]',
+            'description'    => 'permit_empty|max_length[255]',
+            'sub_type'       => 'permit_empty|in_list[VIP,TRIAL]',
+            'max_students'   => 'permit_empty|integer|greater_than[0]',
+            'allowed_grades' => 'permit_empty',
         ];
 
         if (! $this->validateData($input, $rules)) {
@@ -161,7 +173,13 @@ class AdminSubscriptionController extends ApiController
             'days_to_add' => isset($input['days_to_add']) ? (int) $input['days_to_add'] : null,
             'price'       => isset($input['price'])       ? (int) $input['price']       : null,
             'description' => $input['description'] ?? null,
+            'sub_type'    => in_array($input['sub_type'] ?? '', ['VIP', 'TRIAL']) ? $input['sub_type'] : null,
+            'max_students'=> isset($input['max_students']) ? (int) $input['max_students'] : null,
         ], fn($v) => $v !== null);
+
+        if (array_key_exists('allowed_grades', $input)) {
+            $data['allowed_grades'] = $this->normalizeGrades($input['allowed_grades']);
+        }
 
         if (empty($data)) {
             return $this->error('Không có dữ liệu để cập nhật.', 422);
@@ -173,6 +191,90 @@ class AdminSubscriptionController extends ApiController
             array_merge((array) $pkg, $data),
             'Đã cập nhật gói học.'
         );
+    }
+
+    /**
+     * PUT /api/admin/subscriptions/{id}
+     *
+     * Sửa subscription: package_key, status, expired_date.
+     */
+    public function updateSubscription(int $id): ResponseInterface
+    {
+        $sub = $this->repo->findSubscriptionById($id);
+
+        if ($sub === null) {
+            return $this->error('Subscription không tồn tại.', 404);
+        }
+
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getRawInput();
+
+        $rules = [
+            'package_key'  => 'permit_empty|max_length[50]',
+            'status'       => 'permit_empty|in_list[VIP,TRIAL,EXPIRED]',
+            'expired_date' => 'permit_empty',
+        ];
+
+        if (! $this->validateData($input, $rules)) {
+            return $this->error('Dữ liệu không hợp lệ.', 422, $this->validator->getErrors());
+        }
+
+        $data = array_filter([
+            'package_key'  => $input['package_key']  ?? null,
+            'status'       => $input['status']        ?? null,
+            'expired_date' => $input['expired_date']  ?? null,
+        ], fn($v) => $v !== null && $v !== '');
+
+        if (empty($data)) {
+            return $this->error('Không có dữ liệu để cập nhật.', 422);
+        }
+
+        $this->repo->updateSubscription($id, $data);
+        $this->repo->invalidateCache($sub->student_id);
+
+        $updated = $this->repo->findSubscriptionById($id);
+
+        return $this->success($updated, 'Đã cập nhật subscription.');
+    }
+
+    /**
+     * GET /api/admin/subscriptions/list
+     *
+     * Danh sách tất cả subscription kèm thông tin học sinh.
+     */
+    public function listSubscriptions(): ResponseInterface
+    {
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = min((int) ($this->request->getGet('per_page') ?? 20), 100);
+        $search  = $this->request->getGet('search') ?? '';
+        $status  = $this->request->getGet('status') ?? '';
+        $grade   = $this->request->getGet('grade') ?? '';
+
+        $result = $this->repo->listSubscriptions($search, $status, $grade !== '' ? (int) $grade : null, $page, $perPage);
+
+        return $this->success($result);
+    }
+
+    /**
+     * Chuẩn hoá allowed_grades về JSON string hoặc null.
+     * Input có thể là: array [1,2,5], string "1,2,5", string "[1,2,5]", null/empty.
+     */
+    private function normalizeGrades(mixed $raw): ?string
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return null;
+        }
+
+        if (is_array($raw)) {
+            $grades = array_map('intval', $raw);
+        } else {
+            $cleaned = trim((string) $raw, '[]');
+            $grades  = array_map('intval', array_filter(explode(',', $cleaned), fn($v) => $v !== ''));
+        }
+
+        sort($grades);
+
+        return empty($grades) ? null : json_encode($grades);
     }
 
     /**

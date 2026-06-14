@@ -71,6 +71,8 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         // VortexEngine — Subscription Management
         $routes->group('subscriptions', ['filter' => 'module_check:vortex-engine'], function ($routes) {
             $routes->post('activate', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::activate');
+            $routes->put('(:num)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updateSubscription/$1');
+            $routes->get('list', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::listSubscriptions');
             $routes->get('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::packages');
             $routes->get('packages/all', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::allPackages');
             $routes->post('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::createPackage');

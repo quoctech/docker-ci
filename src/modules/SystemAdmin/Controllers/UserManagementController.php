@@ -32,10 +32,13 @@ class UserManagementController extends ApiController
         $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = min((int) ($this->request->getGet('per_page') ?? 20), 100);
 
-        $filters = [
-            'role'   => $this->request->getGet('role'),
-            'status' => $this->request->getGet('status'),
-            'search' => $this->request->getGet('search'),
+        $gradeGet = $this->request->getGet('grade');
+        $filters  = [
+            'role'               => $this->request->getGet('role'),
+            'status'             => $this->request->getGet('status'),
+            'search'             => $this->request->getGet('search'),
+            'grade'              => ($gradeGet !== null && $gradeGet !== '') ? (int) $gradeGet : null,
+            'exclude_subscribed' => (bool) $this->request->getGet('exclude_subscribed'),
         ];
 
         $result = $this->userRepo->listUsers($filters, $page, $perPage);
@@ -101,6 +104,16 @@ class UserManagementController extends ApiController
             $data['phone'] = preg_replace('/[\s\-]/', '', trim($phone));
         }
 
+        $grade = $this->request->getVar('grade');
+        if ($data['role'] === 'user' && $grade !== null && $grade !== '') {
+            $data['grade'] = (int) $grade;
+        }
+
+        $org = trim($this->request->getVar('organization') ?? '');
+        if ($data['role'] === 'workspace_admin' && $org !== '') {
+            $data['organization'] = $org;
+        }
+
         $userUuid = $this->userRepo->create($data);
 
         if (! $userUuid) {
@@ -144,6 +157,14 @@ class UserManagementController extends ApiController
                 }
             }
             $data['username'] = $username ?: null;
+        }
+
+        if (isset($input['grade'])) {
+            $data['grade'] = $input['grade'] !== '' ? (int) $input['grade'] : null;
+        }
+
+        if (isset($input['organization'])) {
+            $data['organization'] = trim($input['organization']) ?: null;
         }
 
         if (empty($data)) {
@@ -322,8 +343,10 @@ class UserManagementController extends ApiController
             'full_name'  => $u->full_name,
             'avatar'     => $u->avatar,
             'avatar_url' => $u->avatar ? '/uploads/avatars/' . $u->avatar : null,
-            'role'       => $u->role,
-            'status'     => $u->status,
+            'role'         => $u->role,
+            'grade'        => isset($u->grade) && $u->grade !== null ? (int) $u->grade : null,
+            'organization' => $u->organization ?? null,
+            'status'       => $u->status,
             'created_at' => $u->created_at,
             'last_login' => $u->last_login_at ?? null,
         ];

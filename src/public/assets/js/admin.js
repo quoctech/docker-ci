@@ -41,16 +41,40 @@ function redirectToLogin() {
     window.location.href = '/admin/login?redirect=' + encodeURIComponent(current);
 }
 
-async function apiRequest(url, options = {}) {
+let _refreshing = null;
+
+async function tryRefreshToken() {
+    if (_refreshing) return _refreshing;
+    _refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+        .then(async r => {
+            const data = await r.json().catch(() => null);
+            if (r.ok && data?.data?.access_token) {
+                localStorage.setItem('access_token', data.data.access_token);
+                if (data.data.user) localStorage.setItem('user', JSON.stringify(data.data.user));
+                return true;
+            }
+            return false;
+        })
+        .catch(() => false)
+        .finally(() => { _refreshing = null; });
+    return _refreshing;
+}
+
+async function apiRequest(url, options = {}, _retry = false) {
     const token = getToken();
-    if (!token) {
-        redirectToLogin();
-        return null;
-    }
+    if (!token) { redirectToLogin(); return null; }
     options.headers = { ...options.headers, 'Authorization': 'Bearer ' + token };
     try {
         const res = await fetch(url, options);
         if (res.status === 401) {
+            if (!_retry) {
+                const ok = await tryRefreshToken();
+                if (ok) {
+                    // Clone options tanpa header cũ để attach token mới
+                    const { headers: _, ...rest } = options;
+                    return apiRequest(url, rest, true);
+                }
+            }
             localStorage.removeItem('access_token');
             localStorage.removeItem('user');
             redirectToLogin();

@@ -18,6 +18,9 @@ class PackageModel extends Model
         'price',
         'days_to_add',
         'is_active',
+        'sub_type',
+        'max_students',
+        'allowed_grades',
     ];
 
     public function findByKey(string $key): ?object

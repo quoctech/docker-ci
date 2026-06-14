@@ -36,6 +36,13 @@
                 <option value="locked">Bị khóa</option>
                 <option value="pending">Chờ duyệt</option>
             </select>
+            <select class="form-input" style="max-width:130px;height:36px" x-model="filters.grade"
+                    @change="loadUsers()" x-show="filters.role === 'user' || filters.role === ''">
+                <option value="">Tất cả lớp</option>
+                <template x-for="g in [1,2,3,4,5,6,7,8,9]" :key="g">
+                    <option :value="g" x-text="'Lớp ' + g"></option>
+                </template>
+            </select>
             <span style="font-size:12px;color:var(--color-text-muted)" x-text="'Tổng: ' + pagination.total + ' người dùng'"></span>
         </div>
     </div>
@@ -50,6 +57,7 @@
                             <th>Người dùng</th>
                             <th>Liên hệ</th>
                             <th>Quyền</th>
+                            <th>Lớp / Tổ chức</th>
                             <th>Trạng thái</th>
                             <th>Đăng nhập gần nhất</th>
                             <th style="width:120px">Thao tác</th>
@@ -79,6 +87,11 @@
                                     <span class="badge"
                                           :class="u.role === 'super_admin' ? 'badge--danger' : u.role === 'workspace_admin' ? 'badge--warning' : 'badge--info'"
                                           x-text="roleLabel(u.role)"></span>
+                                </td>
+                                <td style="font-size:12px;color:var(--color-text-muted)">
+                                    <span x-show="u.role === 'user' && u.grade" x-text="'Lớp ' + u.grade"></span>
+                                    <span x-show="u.role === 'workspace_admin' && u.organization" x-text="u.organization"></span>
+                                    <span x-show="!u.grade && !u.organization">—</span>
                                 </td>
                                 <td>
                                     <span class="badge"
@@ -163,7 +176,7 @@
                         <div class="form-group" style="flex:1">
                             <label>Quyền *</label>
                             <select class="form-input" x-model="form.role">
-                                <option value="user">Người dùng</option>
+                                <option value="user">Học sinh</option>
                                 <option value="workspace_admin">Giáo viên</option>
                                 <option value="super_admin">Super Admin</option>
                             </select>
@@ -178,6 +191,23 @@
                                         x-text="show ? '🙈' : '👁'"></button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Học sinh: chọn lớp -->
+                    <div class="form-group" x-show="form.role === 'user'">
+                        <label>Lớp học</label>
+                        <select class="form-input" x-model="form.grade">
+                            <option value="">-- Chưa xác định --</option>
+                            <template x-for="g in [1,2,3,4,5,6,7,8,9]" :key="g">
+                                <option :value="g" x-text="'Lớp ' + g"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Giáo viên: tổ chức -->
+                    <div class="form-group" x-show="form.role === 'workspace_admin'">
+                        <label>Tổ chức / Trường <span style="font-size:11px;color:var(--color-text-muted)">(tùy chọn)</span></label>
+                        <input class="form-input" x-model="form.organization" placeholder="VD: Trường THCS Nguyễn Trãi">
                     </div>
 
                     <button type="submit" class="btn btn--primary btn--full" :disabled="saving">
@@ -233,12 +263,12 @@ function userManager() {
     return {
         users: [],
         pagination: { page: 1, per_page: 20, total: 0, total_pages: 0 },
-        filters: { search: '', role: '', status: '' },
+        filters: { search: '', role: '', status: '', grade: '' },
         loading: false,
         showModal: false,
         editingUser: null,
         saving: false,
-        form: { full_name: '', email: '', username: '', phone: '', role: 'user', password: '' },
+        form: { full_name: '', email: '', username: '', phone: '', role: 'user', password: '', grade: '', organization: '' },
         showResetModal: false,
         resetTarget: null,
         resetForm: { new_password: '' },
@@ -260,8 +290,9 @@ function userManager() {
                 per_page: this.pagination.per_page,
             });
             if (this.filters.search) params.set('search', this.filters.search);
-            if (this.filters.role) params.set('role', this.filters.role);
+            if (this.filters.role)   params.set('role', this.filters.role);
             if (this.filters.status) params.set('status', this.filters.status);
+            if (this.filters.grade)  params.set('grade', this.filters.grade);
 
             const data = await apiGet('/api/admin/users?' + params.toString());
             if (data && data.status === 'success') {
@@ -279,19 +310,21 @@ function userManager() {
 
         openCreateModal() {
             this.editingUser = null;
-            this.form = { full_name: '', email: '', username: '', phone: '', role: 'user', password: '' };
+            this.form = { full_name: '', email: '', username: '', phone: '', role: 'user', password: '', grade: '', organization: '' };
             this.showModal = true;
         },
 
         openEditModal(user) {
             this.editingUser = user;
             this.form = {
-                full_name: user.full_name,
-                email: user.email,
-                username: user.username || '',
-                phone: user.phone || '',
-                role: user.role,
-                password: '',
+                full_name:    user.full_name,
+                email:        user.email,
+                username:     user.username || '',
+                phone:        user.phone || '',
+                role:         user.role,
+                password:     '',
+                grade:        user.grade || '',
+                organization: user.organization || '',
             };
             this.showModal = true;
         },
@@ -301,11 +334,14 @@ function userManager() {
 
             if (this.editingUser) {
                 // Update existing user
-                const body = new URLSearchParams({
+                const updateFields = {
                     full_name: this.form.full_name,
-                    username: this.form.username,
-                    phone: this.form.phone,
-                });
+                    username:  this.form.username,
+                    phone:     this.form.phone,
+                    grade:        this.form.role === 'user' ? (this.form.grade || '') : '',
+                    organization: this.form.role === 'workspace_admin' ? (this.form.organization || '') : '',
+                };
+                const body = new URLSearchParams(updateFields);
                 const data = await apiPut('/api/admin/users/' + this.editingUser.uuid, body);
 
                 if (data && data.status === 'success') {
@@ -322,7 +358,10 @@ function userManager() {
                 }
             } else {
                 // Create new user
-                const body = new URLSearchParams(this.form);
+                const createFields = { ...this.form };
+                if (this.form.role !== 'user') delete createFields.grade;
+                if (this.form.role !== 'workspace_admin') delete createFields.organization;
+                const body = new URLSearchParams(createFields);
                 const data = await apiPost('/api/admin/users', body);
 
                 if (data && data.status === 'success') {

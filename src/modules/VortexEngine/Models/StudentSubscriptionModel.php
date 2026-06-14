@@ -15,6 +15,7 @@ class StudentSubscriptionModel extends Model
         'student_id',
         'parent_id',
         'package_key',
+        'allowed_grades',
         'status',
         'start_date',
         'expired_date',
