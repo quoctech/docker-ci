@@ -1204,3 +1204,230 @@ a:hover {
         margin: 0 16px;
     }
 }
+
+/* ==========================================================================
+   Utility: Page header (title + action button row)
+   ========================================================================== */
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   Utility: Filter bar
+   ========================================================================== */
+
+.filter-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+}
+
+.filter-bar .filter-bar__search {
+    flex: 2 1 0;
+    min-width: 120px;
+    max-width: none;
+}
+
+.filter-bar select,
+.filter-bar .filter-bar__select {
+    flex: 1 1 0;
+    min-width: 80px;
+}
+
+.filter-bar .filter-bar__count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Utility: Form row (2 fields side by side → stack on mobile)
+   ========================================================================== */
+
+.form-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.form-row > .form-group {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ==========================================================================
+   Utility: Hide helpers
+   ========================================================================== */
+
+@media (max-width: 639px)  { .hide-mobile  { display: none !important; } }
+@media (max-width: 1023px) { .hide-tablet  { display: none !important; } }
+
+/* ==========================================================================
+   Utility: Modal overlay + box (standard inline-modal pattern)
+   ========================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 16px;
+}
+
+.modal-box {
+    background: var(--color-surface);
+    border-radius: 12px;
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    padding: 24px;
+}
+
+/* ==========================================================================
+   Utility: Table card view (converts table to card blocks on mobile)
+   ========================================================================== */
+
+/* Applied as class="table table-card" on tables that need mobile card view */
+
+/* ==========================================================================
+   Mobile (< 640px) — detailed responsive overrides
+   ========================================================================== */
+
+@media (max-width: 639px) {
+
+    /* Page header: stack title above button */
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .page-header .btn { width: 100%; }
+
+    /* Filter bar: wrap on mobile, search full-width, selects 50/50 */
+    .filter-bar {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 6px;
+    }
+    .filter-bar .filter-bar__search,
+    .filter-bar input.form-input {
+        flex: 1 1 100%;
+        max-width: none !important;
+    }
+    .filter-bar select,
+    .filter-bar .filter-bar__select {
+        flex: 1 1 calc(50% - 3px);
+        max-width: none !important;
+    }
+    .filter-bar .filter-bar__count {
+        flex: 1 1 100%;
+        margin-left: 0;
+        text-align: right;
+    }
+    /* Keep filter inputs compact (override 44px global touch rule) */
+    .filter-bar .form-input,
+    .filter-bar select,
+    .filter-bar .btn--sm {
+        height: 40px !important;
+        min-height: 40px !important;
+    }
+
+    /* Form rows: stack */
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Modals: bottom sheet */
+    .confirm-overlay {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+    .confirm-overlay > .card {
+        border-radius: 16px 16px 0 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+    .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+    .modal-box {
+        border-radius: 16px 16px 0 0;
+        max-height: 92vh;
+        padding: 20px 16px;
+    }
+
+    /* Table card view */
+    .table-card thead {
+        display: none;
+    }
+    .table-card tbody tr {
+        display: block;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+    .table-card tbody tr:last-child { margin-bottom: 0; }
+    .table-card tbody td {
+        display: flex;
+        align-items: flex-start;
+        padding: 9px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+        gap: 10px;
+    }
+    .table-card tbody td:last-child { border-bottom: none; }
+    .table-card tbody td[data-label]::before {
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        min-width: 80px;
+        padding-top: 2px;
+        flex-shrink: 0;
+    }
+    .table-card tbody td[data-label=""]::before { display: none; }
+    .table-card tbody td[data-label=""] { justify-content: flex-end; }
+    .table-card tr:hover td { background: transparent !important; }
+
+    /* Pagination: compact */
+    .pagination-bar {
+        padding: 10px 14px;
+    }
+}
+
+/* ==========================================================================
+   Tablet (640px – 1023px) — tweaks
+   ========================================================================== */
+
+@media (min-width: 640px) and (max-width: 1023px) {
+
+    /* Filter bar: let selects stretch, remove hardcoded max-width */
+    .filter-bar .form-input,
+    .filter-bar select {
+        max-width: none !important;
+    }
+    .filter-bar .filter-bar__search {
+        flex: 1 1 auto;
+        max-width: none;
+    }
+}

@@ -9,7 +9,7 @@
 <div x-data="userManager()" x-init="loadUsers()"
      x-on:keydown.escape.window="showModal = false; showResetModal = false">
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+    <div class="page-header">
         <div>
             <h1 class="content__title">Quản lý người dùng</h1>
             <p class="content__subtitle">Quản lý tài khoản, phân quyền và trạng thái người dùng.</p>
@@ -19,31 +19,31 @@
 
     <!-- Filters -->
     <div class="card" style="margin-bottom:20px">
-        <div class="card__body" style="padding:12px 20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-            <input class="form-input" style="max-width:250px;height:36px"
+        <div class="filter-bar">
+            <input class="form-input filter-bar__search" style="height:36px"
                    placeholder="Tên, email, username, SĐT..."
                    x-model="filters.search"
                    @input.debounce.400ms="loadUsers()">
-            <select class="form-input" style="max-width:150px;height:36px" x-model="filters.role" @change="loadUsers()">
+            <select class="form-input" style="height:36px" x-model="filters.role" @change="loadUsers()">
                 <option value="">Tất cả quyền</option>
                 <option value="super_admin">Super Admin</option>
                 <option value="workspace_admin">Giáo viên</option>
                 <option value="user">Người dùng</option>
             </select>
-            <select class="form-input" style="max-width:150px;height:36px" x-model="filters.status" @change="loadUsers()">
+            <select class="form-input" style="height:36px" x-model="filters.status" @change="loadUsers()">
                 <option value="">Tất cả trạng thái</option>
                 <option value="active">Hoạt động</option>
                 <option value="locked">Bị khóa</option>
                 <option value="pending">Chờ duyệt</option>
             </select>
-            <select class="form-input" style="max-width:130px;height:36px" x-model="filters.grade"
+            <select class="form-input" style="height:36px" x-model="filters.grade"
                     @change="loadUsers()" x-show="filters.role === 'user' || filters.role === ''">
                 <option value="">Tất cả lớp</option>
                 <template x-for="g in [1,2,3,4,5,6,7,8,9]" :key="g">
                     <option :value="g" x-text="'Lớp ' + g"></option>
                 </template>
             </select>
-            <span style="font-size:12px;color:var(--color-text-muted)" x-text="'Tổng: ' + pagination.total + ' người dùng'"></span>
+            <span class="filter-bar__count" x-text="'Tổng: ' + pagination.total + ' người dùng'"></span>
         </div>
     </div>
 
@@ -51,56 +51,55 @@
     <div class="card">
         <div class="card__body" style="padding:0">
             <div class="table-wrapper">
-                <table class="table">
+                <table class="table table-card">
                     <thead>
                         <tr>
                             <th>Người dùng</th>
-                            <th>Liên hệ</th>
+                            <th class="hide-mobile">Liên hệ</th>
                             <th>Quyền</th>
-                            <th>Lớp / Tổ chức</th>
+                            <th class="hide-mobile">Lớp / Tổ chức</th>
                             <th>Trạng thái</th>
-                            <th>Đăng nhập gần nhất</th>
-                            <th style="width:120px">Thao tác</th>
+                            <th class="hide-tablet">Đăng nhập gần nhất</th>
+                            <th style="width:110px"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="u in users" :key="u.uuid">
                             <tr>
-                                <td>
+                                <td data-label="Người dùng">
                                     <div style="display:flex;align-items:center;gap:10px">
-                                        <!-- Avatar -->
-                                        <div style="width:36px;height:36px;border-radius:50%;background:var(--color-primary-light);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                                        <div style="width:34px;height:34px;border-radius:50%;background:var(--color-primary-light);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
                                             <img :src="u.avatar_url || ''" x-show="u.avatar_url" style="width:100%;height:100%;object-fit:cover">
-                                            <span x-show="!u.avatar_url" style="font-size:14px;font-weight:600;color:var(--color-primary)" x-text="u.full_name.charAt(0).toUpperCase()"></span>
+                                            <span x-show="!u.avatar_url" style="font-size:13px;font-weight:600;color:var(--color-primary)" x-text="u.full_name.charAt(0).toUpperCase()"></span>
                                         </div>
                                         <div>
-                                            <div style="font-weight:500" x-text="u.full_name"></div>
-                                            <div style="font-size:11px;color:var(--color-text-muted)" x-text="u.username ? '@' + u.username : ''"></div>
+                                            <div style="font-weight:500;font-size:13px" x-text="u.full_name"></div>
+                                            <div style="font-size:11px;color:var(--color-text-muted)" x-text="u.username ? '@' + u.username : u.email"></div>
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Liên hệ" class="hide-mobile">
                                     <div style="font-size:13px" x-text="u.email"></div>
                                     <div style="font-size:11px;color:var(--color-text-muted)" x-text="u.phone || ''"></div>
                                 </td>
-                                <td>
+                                <td data-label="Quyền">
                                     <span class="badge"
                                           :class="u.role === 'super_admin' ? 'badge--danger' : u.role === 'workspace_admin' ? 'badge--warning' : 'badge--info'"
                                           x-text="roleLabel(u.role)"></span>
                                 </td>
-                                <td style="font-size:12px;color:var(--color-text-muted)">
+                                <td data-label="Lớp / Tổ chức" class="hide-mobile" style="font-size:12px;color:var(--color-text-muted)">
                                     <span x-show="u.role === 'user' && u.grade" x-text="'Lớp ' + u.grade"></span>
                                     <span x-show="u.role === 'workspace_admin' && u.organization" x-text="u.organization"></span>
                                     <span x-show="!u.grade && !u.organization">—</span>
                                 </td>
-                                <td>
+                                <td data-label="Trạng thái">
                                     <span class="badge"
                                           :class="u.status === 'active' ? 'badge--success' : u.status === 'locked' ? 'badge--danger' : 'badge--warning'"
                                           x-text="statusLabel(u.status)"></span>
                                 </td>
-                                <td style="font-size:12px;color:var(--color-text-muted)" x-text="u.last_login || '—'"></td>
-                                <td>
-                                    <div style="display:flex;gap:4px">
+                                <td data-label="Đăng nhập" class="hide-tablet" style="font-size:12px;color:var(--color-text-muted)" x-text="u.last_login || '—'"></td>
+                                <td data-label="">
+                                    <div style="display:flex;gap:4px;flex-wrap:nowrap">
                                         <button class="btn btn--ghost btn--sm" @click="openEditModal(u)" title="Chỉnh sửa">✏</button>
                                         <button class="btn btn--ghost btn--sm" @click="openResetPasswordModal(u)" title="Đặt lại mật khẩu">🔑</button>
                                         <button class="btn btn--ghost btn--sm" @click="toggleStatus(u)" :title="u.status === 'active' ? 'Khóa' : 'Mở khóa'">
@@ -162,18 +161,18 @@
                         <label>Email *</label>
                         <input class="form-input" type="email" x-model="form.email" :disabled="!!editingUser" required>
                     </div>
-                    <div style="display:flex;gap:12px">
-                        <div class="form-group" style="flex:1">
+                    <div class="form-row">
+                        <div class="form-group">
                             <label>Username</label>
                             <input class="form-input" x-model="form.username" placeholder="Tùy chọn">
                         </div>
-                        <div class="form-group" style="flex:1">
+                        <div class="form-group">
                             <label>Số điện thoại</label>
                             <input class="form-input" x-model="form.phone" placeholder="Tùy chọn">
                         </div>
                     </div>
-                    <div style="display:flex;gap:12px">
-                        <div class="form-group" style="flex:1">
+                    <div class="form-row">
+                        <div class="form-group">
                             <label>Quyền *</label>
                             <select class="form-input" x-model="form.role">
                                 <option value="user">Học sinh</option>
@@ -181,7 +180,7 @@
                                 <option value="super_admin">Super Admin</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex:1" x-show="!editingUser">
+                        <div class="form-group" x-show="!editingUser">
                             <label>Mật khẩu *</label>
                             <div style="position:relative" x-data="{ show: false }">
                                 <input class="form-input" :type="show ? 'text' : 'password'" x-model="form.password" :required="!editingUser" style="padding-right:40px">

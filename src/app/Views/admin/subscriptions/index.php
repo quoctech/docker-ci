@@ -296,7 +296,7 @@
 
                         <!-- Fields (edit) -->
                         <div x-show="editingId === pkg.id" style="display:grid;gap:8px;margin:12px 0">
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <div class="pkg-edit-row">
                                 <div>
                                     <label class="edit-label">Giá (₫)</label>
                                     <input class="form-input form-input--sm" type="number" x-model="editBuf.price" min="0">
@@ -306,7 +306,7 @@
                                     <input class="form-input form-input--sm" type="number" x-model="editBuf.days_to_add" min="1">
                                 </div>
                             </div>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <div class="pkg-edit-row">
                                 <div>
                                     <label class="edit-label">Loại đăng ký</label>
                                     <select class="form-input form-input--sm" x-model="editBuf.sub_type">
@@ -379,75 +379,74 @@
     <div x-show="tab === 'list'">
 
         <!-- Filters -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-            <input class="form-input" style="max-width:240px;height:36px"
+        <div class="filter-bar" style="margin-bottom:16px;padding:0">
+            <input class="form-input filter-bar__search" style="height:36px"
                    placeholder="Tìm tên, email, username..."
                    x-model="subFilters.search"
                    @input.debounce.400ms="loadSubList(true)">
-            <select class="form-input" style="max-width:150px;height:36px"
+            <select class="form-input" style="height:36px"
                     x-model="subFilters.status" @change="loadSubList(true)">
                 <option value="">Tất cả trạng thái</option>
                 <option value="VIP">Premium</option>
                 <option value="TRIAL">Dùng thử</option>
                 <option value="EXPIRED">Hết hạn</option>
             </select>
-            <select class="form-input" style="max-width:130px;height:36px"
+            <select class="form-input" style="height:36px"
                     x-model="subFilters.grade" @change="loadSubList(true)">
                 <option value="">Tất cả lớp</option>
                 <template x-for="g in [1,2,3,4,5,6,7,8,9]" :key="g">
                     <option :value="g" x-text="'Lớp ' + g"></option>
                 </template>
             </select>
-            <span style="font-size:12px;color:var(--color-text-muted);margin-left:auto"
-                  x-text="'Tổng: ' + subPagination.total + ' bản ghi'"></span>
+            <span class="filter-bar__count" x-text="'Tổng: ' + subPagination.total + ' bản ghi'"></span>
         </div>
 
         <div class="card">
             <div class="card__body" style="padding:0">
                 <div x-show="loadingSubs" style="padding:40px;text-align:center;color:var(--color-text-muted)">Đang tải...</div>
                 <div class="table-wrapper" x-show="!loadingSubs">
-                    <table class="table">
+                    <table class="table table-card">
                         <thead>
                             <tr>
                                 <th>Học sinh</th>
-                                <th>Lớp</th>
-                                <th>Gói học</th>
-                                <th>Lớp được học</th>
+                                <th class="hide-mobile">Lớp</th>
+                                <th class="hide-mobile">Gói học</th>
+                                <th class="hide-tablet">Lớp được học</th>
                                 <th>Trạng thái</th>
-                                <th>Ngày bắt đầu</th>
+                                <th class="hide-tablet">Bắt đầu</th>
                                 <th>Hết hạn</th>
-                                <th style="width:52px"></th>
+                                <th style="width:48px"></th>
                             </tr>
                         </thead>
                         <tbody>
                             <template x-for="s in subscriptions" :key="s.id">
                                 <tr>
-                                    <td>
+                                    <td data-label="Học sinh">
                                         <div style="font-weight:500;font-size:13px" x-text="s.full_name || '—'"></div>
                                         <div style="font-size:11px;color:var(--color-text-muted)" x-text="s.email || ''"></div>
                                     </td>
-                                    <td style="font-size:13px" x-text="s.grade ? 'Lớp ' + s.grade : '—'"></td>
-                                    <td>
+                                    <td data-label="Lớp" class="hide-mobile" style="font-size:13px" x-text="s.grade ? 'Lớp ' + s.grade : '—'"></td>
+                                    <td data-label="Gói học" class="hide-mobile">
                                         <div style="font-size:13px;font-weight:500" x-text="s.package_name || s.package_key"></div>
                                         <div style="font-size:11px;color:var(--color-text-muted)"
                                              x-text="s.days_to_add + ' ngày · ' + Number(s.price).toLocaleString('vi-VN') + '₫'"></div>
                                     </td>
-                                    <td style="font-size:12px">
+                                    <td data-label="Lớp học" class="hide-tablet" style="font-size:12px">
                                         <template x-if="s.allowed_grades">
                                             <span class="badge-tag badge-tag--blue"
                                                   x-text="'Lớp ' + JSON.parse(s.allowed_grades).join(', ')"></span>
                                         </template>
                                         <span x-show="!s.allowed_grades" style="color:var(--color-text-muted)">Tất cả</span>
                                     </td>
-                                    <td>
+                                    <td data-label="Trạng thái">
                                         <span class="badge"
                                               :class="s.status === 'VIP' ? 'badge--success' : s.status === 'TRIAL' ? 'badge--info' : 'badge--danger'"
                                               x-text="s.status === 'VIP' ? 'Premium' : s.status === 'TRIAL' ? 'Dùng thử' : 'Hết hạn'"></span>
                                     </td>
-                                    <td style="font-size:12px;color:var(--color-text-muted)" x-text="s.start_date ? s.start_date.substring(0,10) : '—'"></td>
-                                    <td style="font-size:12px" :style="isExpired(s.expired_date) ? 'color:#ef4444' : ''"
+                                    <td data-label="Bắt đầu" class="hide-tablet" style="font-size:12px;color:var(--color-text-muted)" x-text="s.start_date ? s.start_date.substring(0,10) : '—'"></td>
+                                    <td data-label="Hết hạn" style="font-size:12px" :style="isExpired(s.expired_date) ? 'color:#ef4444' : ''"
                                         x-text="s.expired_date ? s.expired_date.substring(0,10) : '—'"></td>
-                                    <td>
+                                    <td data-label="">
                                         <button class="btn btn--ghost btn--sm" style="padding:4px 8px;font-size:12px"
                                                 @click="openEditSub(s)" title="Sửa">✏️</button>
                                     </td>
@@ -478,9 +477,9 @@
 
     <!-- ===== MODAL: Sửa subscription ===== -->
     <div x-show="editingSub" x-cloak
-         style="position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45)"
+         class="modal-overlay"
          @click.self="editingSub = null">
-        <div style="background:var(--color-surface);border-radius:12px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+        <div class="modal-box" style="max-width:440px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
                 <h3 style="font-size:15px;font-weight:600;margin:0">Sửa đăng ký</h3>
                 <button class="btn btn--ghost btn--sm" @click="editingSub = null">✕</button>
@@ -538,20 +537,26 @@
 /* ---- Header & tabs ---- */
 .sub-header {
     display: flex; justify-content: space-between; align-items: flex-start;
-    margin-bottom: 28px; flex-wrap: wrap; gap: 16px;
+    margin-bottom: 28px; flex-wrap: wrap; gap: 12px;
 }
 .sub-tabs {
     display: flex; gap: 4px;
     background: var(--color-bg, #f8fafc);
     border: 1px solid var(--color-border, #e2e8f0);
     border-radius: 10px; padding: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    max-width: 100%;
 }
+.sub-tabs::-webkit-scrollbar { display: none; }
 .sub-tab {
     display: flex; align-items: center; gap: 6px;
-    padding: 7px 16px; border-radius: 7px; border: none; cursor: pointer;
+    padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer;
     font-size: 13px; font-weight: 500;
     background: transparent; color: var(--color-text-muted, #64748b);
-    transition: all .15s;
+    transition: all .15s; white-space: nowrap; flex-shrink: 0;
 }
 .sub-tab:hover { background: rgba(0,0,0,.04); color: var(--color-text, #1e293b); }
 .sub-tab--active {
@@ -559,11 +564,16 @@
     color: var(--color-primary, #4f46e5);
     box-shadow: 0 1px 4px rgba(0,0,0,.1);
 }
+@media (max-width: 639px) {
+    .sub-header { flex-direction: column; gap: 10px; }
+    .sub-tabs { align-self: stretch; }
+    .sub-tab { padding: 7px 12px; font-size: 12px; }
+}
 
 /* ---- Activate layout ---- */
 .activate-layout {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 360px 1fr;
     gap: 20px;
     align-items: start;
 }
@@ -767,6 +777,17 @@
 }
 .create-panel__grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+@media (max-width: 639px) {
+    .create-panel__grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Package inline-edit 2-col rows ---- */
+.pkg-edit-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+@media (max-width: 479px) {
+    .pkg-edit-row { grid-template-columns: 1fr; }
 }
 
 /* ---- Package cards grid ---- */
