@@ -64,7 +64,9 @@ COPY --from=vendor /app/vendor /var/www/html/vendor
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/writable
+    && chmod -R 755 /var/www/html/writable \
+    && mkdir -p /var/www/html/writable/uploads/avatars \
+    && chmod -R 775 /var/www/html/writable/uploads
 
 USER www-data
 

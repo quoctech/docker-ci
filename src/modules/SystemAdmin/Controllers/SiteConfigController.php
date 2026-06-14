@@ -4,40 +4,36 @@ namespace Modules\SystemAdmin\Controllers;
 
 use App\Controllers\ApiController;
 use CodeIgniter\HTTP\ResponseInterface;
-use Modules\SystemAdmin\Models\SiteConfigModel;
+use Modules\SystemAdmin\Repositories\SiteConfigRepository;
 
 /**
  * SiteConfigController - CRUD cấu hình website động.
  *
- * Quản lý key-value config theo nhóm, cache Redis.
+ * Xử lý request/response. Logic database ủy thác cho Repository.
  */
 class SiteConfigController extends ApiController
 {
-    private SiteConfigModel $configModel;
+    private SiteConfigRepository $configRepo;
 
     public function __construct()
     {
-        $this->configModel = new SiteConfigModel();
+        $this->configRepo = new SiteConfigRepository();
     }
 
     /**
      * GET /api/admin/configs
-     * Lấy toàn bộ cấu hình, nhóm theo group.
      */
     public function index(): ResponseInterface
     {
-        $grouped = $this->configModel->getAllGrouped();
-
-        return $this->success($grouped);
+        return $this->success($this->configRepo->getAllGrouped());
     }
 
     /**
      * GET /api/admin/configs/(:any)
-     * Lấy giá trị 1 cấu hình theo key.
      */
     public function show(string $key): ResponseInterface
     {
-        $value = $this->configModel->getValue($key);
+        $value = $this->configRepo->getValue($key);
 
         if ($value === null) {
             return $this->error('Cấu hình không tồn tại.', 404);
@@ -48,7 +44,6 @@ class SiteConfigController extends ApiController
 
     /**
      * POST /api/admin/configs
-     * Tạo cấu hình mới.
      */
     public function create(): ResponseInterface
     {
@@ -64,7 +59,7 @@ class SiteConfigController extends ApiController
             return $this->error('Dữ liệu không hợp lệ.', 422, $this->validator->getErrors());
         }
 
-        $this->configModel->setValue(
+        $this->configRepo->setValue(
             $this->request->getVar('key'),
             $this->request->getVar('value') ?? '',
             $this->request->getVar('group') ?? 'general',
@@ -77,47 +72,36 @@ class SiteConfigController extends ApiController
 
     /**
      * PUT /api/admin/configs/(:any)
-     * Cập nhật giá trị cấu hình.
      */
     public function update(string $key): ResponseInterface
     {
-        $existing = $this->configModel->where('key', $key)->first();
+        $existing = $this->configRepo->findByKey($key);
 
         if (! $existing) {
             return $this->error('Cấu hình không tồn tại.', 404);
         }
 
-        // CI4: đọc body từ PUT/PATCH request
-        // getVar() không luôn hoạt động đúng với PUT + urlencoded
-        // Dùng getRawInput() để parse body thủ công
         $input = $this->request->getRawInput();
         $value = $input['value'] ?? '';
 
-        $this->configModel->setValue(
-            $key,
-            $value,
-            $existing->group,
-            $existing->type,
-            $existing->description
-        );
+        $this->configRepo->setValue($key, $value, $existing->group, $existing->type, $existing->description);
 
         return $this->success(['key' => $key, 'value' => $value], 'Đã cập nhật cấu hình.');
     }
 
     /**
      * DELETE /api/admin/configs/(:any)
-     * Xóa cấu hình.
      */
     public function delete(string $key): ResponseInterface
     {
-        $existing = $this->configModel->where('key', $key)->first();
+        $existing = $this->configRepo->findByKey($key);
 
         if (! $existing) {
             return $this->error('Cấu hình không tồn tại.', 404);
         }
 
-        $this->configModel->delete($existing->id);
-        $this->configModel->invalidateCache();
+        $this->configRepo->delete($existing->id);
+        $this->configRepo->invalidateCache();
 
         return $this->success(null, 'Đã xóa cấu hình.');
     }

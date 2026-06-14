@@ -16,6 +16,9 @@
         <li class="sidebar__nav-group">
             <div class="sidebar__nav-label">Hệ thống</div>
             <ul>
+                <li class="sidebar__nav-item <?= str_starts_with(uri_string(), 'admin/users') ? 'sidebar__nav-item--active' : '' ?>">
+                    <a href="/admin/users">👤 Quản lý người dùng</a>
+                </li>
                 <li class="sidebar__nav-item <?= str_starts_with(uri_string(), 'admin/modules') ? 'sidebar__nav-item--active' : '' ?>">
                     <a href="/admin/modules">🧩 Quản lý Module</a>
                 </li>
@@ -34,4 +37,9 @@
             </ul>
         </li>
     </ul>
+
+    <!-- Version -->
+    <div class="sidebar__version">
+        v<?= env('APP_VERSION', '1.0.0') ?>
+    </div>
 </aside>

@@ -969,3 +969,209 @@ a:hover {
         transform: translateX(20px);
     }
 }
+
+/* ==========================================================================
+   Sidebar Version
+   ========================================================================== */
+
+.sidebar__version {
+    padding: 12px 20px;
+    font-size: 11px;
+    color: #64748B;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    text-align: center;
+}
+
+/* ==========================================================================
+   Header Profile Dropdown
+   ========================================================================== */
+
+.header__profile {
+    position: relative;
+}
+
+.header__profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.header__profile-btn:hover {
+    background: #F1F5F9;
+}
+
+.header__avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.header__user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.header__dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    min-width: 180px;
+    padding: 4px;
+    z-index: 200;
+}
+
+.header__dropdown-item {
+    display: block;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--color-text);
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.header__dropdown-item:hover {
+    background: #F1F5F9;
+    color: var(--color-primary);
+}
+
+/* ==========================================================================
+   Confirm Dialog
+   ========================================================================== */
+
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    padding: 16px;
+}
+
+.confirm-dialog {
+    background: var(--color-surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 32px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+    animation: confirmIn 0.2s ease;
+}
+
+@keyframes confirmIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.confirm-dialog__icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+}
+
+.confirm-dialog__icon--danger {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.confirm-dialog__icon--warning {
+    background: #FEF3C7;
+    color: #D97706;
+}
+
+.confirm-dialog__icon--info {
+    background: #DBEAFE;
+    color: #2563EB;
+}
+
+.confirm-dialog__title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--color-text);
+}
+
+.confirm-dialog__message {
+    font-size: 14px;
+    color: var(--color-text-muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.confirm-dialog__actions .btn {
+    min-width: 100px;
+}
+
+/* ==========================================================================
+   Modal: wider for user edit
+   ========================================================================== */
+
+@media (min-width: 768px) {
+    .modal--wide {
+        max-width: 600px !important;
+    }
+}
+
+/* Hide x-cloak elements until Alpine initializes */
+[x-cloak] {
+    display: none !important;
+}
+
+/* ==========================================================================
+   Responsive: header profile on mobile
+   ========================================================================== */
+
+@media (max-width: 767px) {
+    .header__user-name {
+        display: none;
+    }
+
+    .confirm-dialog {
+        padding: 24px 20px;
+        margin: 0 16px;
+    }
+}

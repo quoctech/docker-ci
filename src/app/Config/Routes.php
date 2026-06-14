@@ -16,7 +16,12 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('/', '\Modules\SystemAdmin\Controllers\AdminPageController::dashboard');
     $routes->get('modules', '\Modules\SystemAdmin\Controllers\AdminPageController::modules');
     $routes->get('configs', '\Modules\SystemAdmin\Controllers\AdminPageController::configs');
+    $routes->get('users', '\Modules\SystemAdmin\Controllers\AdminPageController::users');
+    $routes->get('profile', '\Modules\SystemAdmin\Controllers\AdminPageController::profile');
 });
+
+// Serve uploaded files (avatar)
+$routes->get('uploads/avatars/(:any)', 'UploadController::avatar/$1');
 
 // ==========================================================================
 // API Routes
@@ -62,7 +67,12 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // User Management
         $routes->get('users', '\Modules\SystemAdmin\Controllers\UserManagementController::index');
+        $routes->get('users/(:num)', '\Modules\SystemAdmin\Controllers\UserManagementController::show/$1');
+        $routes->post('users', '\Modules\SystemAdmin\Controllers\UserManagementController::create');
+        $routes->put('users/(:num)', '\Modules\SystemAdmin\Controllers\UserManagementController::update/$1');
         $routes->put('users/(:num)/status', '\Modules\SystemAdmin\Controllers\UserManagementController::updateStatus/$1');
         $routes->put('users/(:num)/role', '\Modules\SystemAdmin\Controllers\UserManagementController::updateRole/$1');
+        $routes->post('users/(:num)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::uploadAvatar/$1');
+        $routes->delete('users/(:num)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::deleteAvatar/$1');
     });
 });

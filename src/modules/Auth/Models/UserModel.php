@@ -30,6 +30,7 @@ class UserModel extends Model
         'phone',                   // Số điện thoại liên hệ
         'password_hash',           // Mật khẩu đã hash (Argon2id)
         'full_name',               // Họ tên đầy đủ hiển thị
+        'avatar',                  // Đường dẫn file avatar (relative path)
         'role',                    // Phân quyền: super_admin | workspace_admin | user
         'status',                  // Trạng thái: active | locked | pending
         'email_verified_at',       // Thời điểm xác minh email

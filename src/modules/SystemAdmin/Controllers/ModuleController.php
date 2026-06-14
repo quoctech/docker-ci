@@ -4,15 +4,20 @@ namespace Modules\SystemAdmin\Controllers;
 
 use App\Controllers\ApiController;
 use CodeIgniter\HTTP\ResponseInterface;
-use Modules\SystemAdmin\Models\ModuleModel;
+use Modules\SystemAdmin\Repositories\ModuleRepository;
 
+/**
+ * ModuleController - Quản lý module hệ thống.
+ *
+ * Xử lý request/response. Logic database ủy thác cho Repository.
+ */
 class ModuleController extends ApiController
 {
-    private ModuleModel $moduleModel;
+    private ModuleRepository $moduleRepo;
 
     public function __construct()
     {
-        $this->moduleModel = new ModuleModel();
+        $this->moduleRepo = new ModuleRepository();
     }
 
     /**
@@ -20,7 +25,7 @@ class ModuleController extends ApiController
      */
     public function index(): ResponseInterface
     {
-        $modules = $this->moduleModel->getAllModules();
+        $modules = $this->moduleRepo->getAll();
 
         return $this->success(array_map(fn($m) => [
             'id'          => (int) $m->id,
@@ -38,18 +43,18 @@ class ModuleController extends ApiController
      */
     public function toggle(int $id): ResponseInterface
     {
-        $module = $this->moduleModel->find($id);
+        $module = $this->moduleRepo->findById($id);
 
         if (! $module) {
             return $this->error('Không tìm thấy module.', 404);
         }
 
         if ($module->is_core) {
-            return $this->error('Module lõi không thể tắt.', 403);
+            return $this->error('Module Core không thể tắt.', 403);
         }
 
         $newState = ! (bool) $module->is_enabled;
-        $this->moduleModel->toggleModule($id, $newState);
+        $this->moduleRepo->toggle($id, $newState);
 
         return $this->success([
             'slug'       => $module->slug,
@@ -59,11 +64,10 @@ class ModuleController extends ApiController
 
     /**
      * POST /api/admin/modules/sync-cache
-     * Force sync all module statuses to Redis.
      */
     public function syncCache(): ResponseInterface
     {
-        $this->moduleModel->syncAllToRedis();
+        $this->moduleRepo->syncAllToRedis();
 
         return $this->success(null, 'Đã đồng bộ cache Redis.');
     }

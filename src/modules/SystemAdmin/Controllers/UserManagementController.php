@@ -5,16 +5,23 @@ namespace Modules\SystemAdmin\Controllers;
 use App\Controllers\ApiController;
 use App\Libraries\RedisService;
 use CodeIgniter\HTTP\ResponseInterface;
-use Modules\Auth\Models\UserModel;
-use Modules\Auth\Models\RefreshTokenModel;
+use Modules\Auth\Repositories\UserRepository;
+use Modules\Auth\Repositories\RefreshTokenRepository;
 
+/**
+ * UserManagementController - Quản lý người dùng (Super Admin only).
+ *
+ * Xử lý request/response. Logic database ủy thác cho Repository.
+ */
 class UserManagementController extends ApiController
 {
-    private UserModel $userModel;
+    private UserRepository $userRepo;
+    private RefreshTokenRepository $tokenRepo;
 
     public function __construct()
     {
-        $this->userModel = new UserModel();
+        $this->userRepo  = new UserRepository();
+        $this->tokenRepo = new RefreshTokenRepository();
     }
 
     /**
@@ -22,55 +29,130 @@ class UserManagementController extends ApiController
      */
     public function index(): ResponseInterface
     {
-        $page    = (int) ($this->request->getGet('page') ?? 1);
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
         $perPage = min((int) ($this->request->getGet('per_page') ?? 20), 100);
-        $role    = $this->request->getGet('role');
-        $status  = $this->request->getGet('status');
-        $search  = $this->request->getGet('search');
 
-        $builder = $this->userModel->builder();
+        $filters = [
+            'role'   => $this->request->getGet('role'),
+            'status' => $this->request->getGet('status'),
+            'search' => $this->request->getGet('search'),
+        ];
 
-        if ($role) {
-            $builder->where('role', $role);
-        }
-
-        if ($status) {
-            $builder->where('status', $status);
-        }
-
-        if ($search) {
-            $builder->groupStart()
-                    ->like('email', $search)
-                    ->orLike('full_name', $search)
-                    ->groupEnd();
-        }
-
-        $builder->where('deleted_at', null);
-
-        $total = $builder->countAllResults(false);
-        $users = $builder->orderBy('created_at', 'DESC')
-                         ->limit($perPage, ($page - 1) * $perPage)
-                         ->get()
-                         ->getResult();
+        $result = $this->userRepo->listUsers($filters, $page, $perPage);
 
         return $this->success([
-            'users' => array_map(fn($u) => [
-                'id'         => (int) $u->id,
-                'uuid'       => $u->uuid,
-                'email'      => $u->email,
-                'full_name'  => $u->full_name,
-                'role'       => $u->role,
-                'status'     => $u->status,
-                'created_at' => $u->created_at,
-                'last_login' => $u->last_login_at,
-            ], $users),
+            'users'      => array_map(fn($u) => $this->formatUser($u), $result['users']),
             'pagination' => [
-                'page'       => $page,
-                'per_page'   => $perPage,
-                'total'      => $total,
-                'total_pages' => (int) ceil($total / $perPage),
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total'       => $result['total'],
+                'total_pages' => (int) ceil($result['total'] / $perPage),
             ],
         ]);
+    }
+
+    /**
+     * GET /api/admin/users/(:num)
+     */
+    public function show(int $id): ResponseInterface
+    {
+        $user = $this->userRepo->findById($id);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        return $this->success($this->formatUser($user));
+    }
+
+    /**
+     * POST /api/admin/users
+     */
+    public function create(): ResponseInterface
+    {
+        $rules = [
+            'email'     => 'required|valid_email|max_length[254]|is_unique[users.email]',
+            'full_name' => 'required|min_length[2]|max_length[100]',
+            'password'  => 'required|min_length[4]|max_length[72]',
+            'role'      => 'required|in_list[super_admin,workspace_admin,user]',
+            'username'  => 'permit_empty|alpha_numeric|min_length[3]|max_length[30]|is_unique[users.username]',
+            'phone'     => 'permit_empty|max_length[20]',
+        ];
+
+        if (! $this->validate($rules)) {
+            return $this->error('Dữ liệu không hợp lệ.', 422, $this->validator->getErrors());
+        }
+
+        $data = [
+            'email'         => strtolower(trim($this->request->getVar('email'))),
+            'full_name'     => trim($this->request->getVar('full_name')),
+            'password_hash' => hash_password($this->request->getVar('password')),
+            'role'          => $this->request->getVar('role'),
+            'status'        => STATUS_ACTIVE,
+        ];
+
+        $username = $this->request->getVar('username');
+        if (! empty($username)) {
+            $data['username'] = strtolower(trim($username));
+        }
+
+        $phone = $this->request->getVar('phone');
+        if (! empty($phone)) {
+            $data['phone'] = trim($phone);
+        }
+
+        $userId = $this->userRepo->create($data);
+
+        if (! $userId) {
+            return $this->error('Tạo người dùng thất bại.', 500);
+        }
+
+        $user = $this->userRepo->findById($userId);
+
+        return $this->success($this->formatUser($user), 'Đã tạo người dùng.', 201);
+    }
+
+    /**
+     * PUT /api/admin/users/(:num)
+     */
+    public function update(int $id): ResponseInterface
+    {
+        $user = $this->userRepo->findById($id);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        $input = $this->request->getRawInput();
+        $data  = [];
+
+        if (isset($input['full_name']) && ! empty(trim($input['full_name']))) {
+            $data['full_name'] = trim($input['full_name']);
+        }
+
+        if (isset($input['phone'])) {
+            $data['phone'] = trim($input['phone']);
+        }
+
+        if (isset($input['username'])) {
+            $username = strtolower(trim($input['username']));
+            if (! empty($username)) {
+                $existing = $this->userRepo->findByUsername($username);
+                if ($existing && (int) $existing->id !== $id) {
+                    return $this->error('Username đã tồn tại.', 422);
+                }
+            }
+            $data['username'] = $username ?: null;
+        }
+
+        if (empty($data)) {
+            return $this->error('Không có dữ liệu cập nhật.', 400);
+        }
+
+        $this->userRepo->update($id, $data);
+        $user = $this->userRepo->findById($id);
+
+        return $this->success($this->formatUser($user), 'Đã cập nhật người dùng.');
     }
 
     /**
@@ -78,38 +160,31 @@ class UserManagementController extends ApiController
      */
     public function updateStatus(int $id): ResponseInterface
     {
-        $rules = [
-            'status' => 'required|in_list[active,locked,pending]',
-        ];
-
-        if (! $this->validate($rules)) {
-            return $this->error('Validation failed.', 422, $this->validator->getErrors());
-        }
-
-        $user = $this->userModel->find($id);
+        $user = $this->userRepo->findById($id);
 
         if (! $user) {
-            return $this->error('User not found.', 404);
+            return $this->error('Không tìm thấy người dùng.', 404);
         }
 
-        // Cannot modify super_admin unless you are super_admin
-        if ($user->role === 'super_admin' && $this->getAuthUser()->role !== 'super_admin') {
-            return $this->error('Cannot modify super admin.', 403);
+        if ($user->role === ROLE_SUPER_ADMIN && $this->getAuthUser()->role !== ROLE_SUPER_ADMIN) {
+            return $this->error('Không thể thao tác trên Super Admin.', 403);
         }
 
-        $newStatus = $this->request->getPost('status');
-        $this->userModel->update($id, ['status' => $newStatus]);
+        $input     = $this->request->getRawInput();
+        $newStatus = $input['status'] ?? '';
 
-        // If locking, kill all sessions immediately
-        if ($newStatus === 'locked') {
+        if (! in_array($newStatus, [STATUS_ACTIVE, STATUS_LOCKED, STATUS_PENDING], true)) {
+            return $this->error('Trạng thái không hợp lệ.', 422);
+        }
+
+        $this->userRepo->update($id, ['status' => $newStatus]);
+
+        if ($newStatus === STATUS_LOCKED) {
             RedisService::revokeAllSessions($id);
-            (new RefreshTokenModel())->revokeAllForUser($id);
+            $this->tokenRepo->revokeAllForUser($id);
         }
 
-        return $this->success([
-            'uuid'   => $user->uuid,
-            'status' => $newStatus,
-        ], "User status updated to {$newStatus}.");
+        return $this->success(['id' => $id, 'status' => $newStatus], 'Đã cập nhật trạng thái.');
     }
 
     /**
@@ -117,35 +192,115 @@ class UserManagementController extends ApiController
      */
     public function updateRole(int $id): ResponseInterface
     {
+        $user = $this->userRepo->findById($id);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        $input   = $this->request->getRawInput();
+        $newRole = $input['role'] ?? '';
+
+        if (! in_array($newRole, [ROLE_SUPER_ADMIN, ROLE_WORKSPACE_ADMIN, ROLE_USER], true)) {
+            return $this->error('Quyền không hợp lệ.', 422);
+        }
+
+        if ($newRole === ROLE_SUPER_ADMIN && $this->getAuthUser()->role !== ROLE_SUPER_ADMIN) {
+            return $this->error('Chỉ Super Admin mới có thể phân quyền Super Admin.', 403);
+        }
+
+        $this->userRepo->update($id, ['role' => $newRole]);
+
+        RedisService::revokeAllSessions($id);
+        $this->tokenRepo->revokeAllForUser($id);
+
+        return $this->success(['id' => $id, 'role' => $newRole], 'Đã cập nhật quyền.');
+    }
+
+    /**
+     * POST /api/admin/users/(:num)/avatar
+     */
+    public function uploadAvatar(int $id): ResponseInterface
+    {
+        $user = $this->userRepo->findById($id);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        $file = $this->request->getFile('avatar');
+
+        if (! $file || ! $file->isValid()) {
+            return $this->error('File không hợp lệ.', 422);
+        }
+
         $rules = [
-            'role' => 'required|in_list[super_admin,workspace_admin,user]',
+            'avatar' => 'uploaded[avatar]|max_size[avatar,2048]|mime_in[avatar,image/png,image/jpeg,image/webp]|is_image[avatar]',
         ];
 
         if (! $this->validate($rules)) {
-            return $this->error('Validation failed.', 422, $this->validator->getErrors());
+            return $this->error('File không hợp lệ.', 422, $this->validator->getErrors());
         }
 
-        $user = $this->userModel->find($id);
-
-        if (! $user) {
-            return $this->error('User not found.', 404);
+        // Xóa avatar cũ
+        if (! empty($user->avatar)) {
+            $oldPath = WRITEPATH . 'uploads/avatars/' . $user->avatar;
+            if (is_file($oldPath)) {
+                unlink($oldPath);
+            }
         }
 
-        // Only super_admin can assign super_admin role
-        $newRole = $this->request->getPost('role');
-        if ($newRole === 'super_admin' && $this->getAuthUser()->role !== 'super_admin') {
-            return $this->error('Only super admin can promote to super admin.', 403);
-        }
+        $newName = $file->getRandomName();
+        $file->move(WRITEPATH . 'uploads/avatars/', $newName);
 
-        $this->userModel->update($id, ['role' => $newRole]);
-
-        // Force re-login to get new token with updated role
-        RedisService::revokeAllSessions($id);
-        (new RefreshTokenModel())->revokeAllForUser($id);
+        $this->userRepo->update($id, ['avatar' => $newName]);
 
         return $this->success([
-            'uuid' => $user->uuid,
-            'role' => $newRole,
-        ], "User role updated to {$newRole}.");
+            'avatar'     => $newName,
+            'avatar_url' => '/uploads/avatars/' . $newName,
+        ], 'Đã cập nhật avatar.');
+    }
+
+    /**
+     * DELETE /api/admin/users/(:num)/avatar
+     */
+    public function deleteAvatar(int $id): ResponseInterface
+    {
+        $user = $this->userRepo->findById($id);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        if (! empty($user->avatar)) {
+            $path = WRITEPATH . 'uploads/avatars/' . $user->avatar;
+            if (is_file($path)) {
+                unlink($path);
+            }
+            $this->userRepo->update($id, ['avatar' => null]);
+        }
+
+        return $this->success(null, 'Đã xóa avatar.');
+    }
+
+    /**
+     * Format user cho response — KHÔNG trả password_hash, security fields.
+     */
+    private function formatUser(object $u): array
+    {
+        return [
+            'id'         => (int) $u->id,
+            'uuid'       => $u->uuid,
+            'email'      => $u->email,
+            'username'   => $u->username,
+            'phone'      => $u->phone,
+            'full_name'  => $u->full_name,
+            'avatar'     => $u->avatar,
+            'avatar_url' => $u->avatar ? '/uploads/avatars/' . $u->avatar : null,
+            'role'       => $u->role,
+            'status'     => $u->status,
+            'created_at' => $u->created_at,
+            'last_login' => $u->last_login_at ?? null,
+        ];
     }
 }

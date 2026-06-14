@@ -202,11 +202,12 @@ class AuthController extends ApiController
             'token_type'   => 'Bearer',
             'expires_in'   => $this->jwt->getAccessTtl(),
             'user'         => [
-                'uuid'      => $user->uuid,
-                'email'     => $user->email,
-                'username'  => $user->username,
-                'full_name' => $user->full_name,
-                'role'      => $user->role,
+                'uuid'       => $user->uuid,
+                'email'      => $user->email,
+                'username'   => $user->username,
+                'full_name'  => $user->full_name,
+                'avatar_url' => $user->avatar ? '/uploads/avatars/' . $user->avatar : null,
+                'role'       => $user->role,
             ],
         ], 'Login successful.');
     }
@@ -363,6 +364,7 @@ class AuthController extends ApiController
             'email'      => $user->email,
             'username'   => $user->username,
             'full_name'  => $user->full_name,
+            'avatar_url' => $user->avatar ? '/uploads/avatars/' . $user->avatar : null,
             'phone'      => $user->phone,
             'role'       => $user->role,
             'created_at' => $user->created_at,

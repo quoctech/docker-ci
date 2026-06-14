@@ -50,4 +50,22 @@ class AdminPageController extends BaseController
     {
         return view('admin/configs/index');
     }
+
+    /**
+     * GET /admin/users
+     * Trang quản lý người dùng.
+     */
+    public function users(): string
+    {
+        return view('admin/users/index');
+    }
+
+    /**
+     * GET /admin/profile
+     * Trang hồ sơ cá nhân.
+     */
+    public function profile(): string
+    {
+        return view('admin/profile');
+    }
 }

@@ -32,5 +32,8 @@
     <!-- Toast Container -->
     <?= $this->include('components/toast') ?>
 
+    <!-- Confirm Dialog -->
+    <?= $this->include('components/confirm') ?>
+
 </body>
 </html>
