@@ -16,9 +16,9 @@ class RefreshTokenRepository
         $this->model = new RefreshTokenModel();
     }
 
-    public function store(int $userId, string $tokenHash, string $expiresAt, string $ip, ?string $userAgent): void
+    public function store(string $userUuid, string $tokenHash, string $expiresAt, string $ip, ?string $userAgent): void
     {
-        $this->model->storeToken($userId, $tokenHash, $expiresAt, $ip, $userAgent);
+        $this->model->storeToken($userUuid, $tokenHash, $expiresAt, $ip, $userAgent);
     }
 
     public function findValidToken(string $tokenHash): ?object
@@ -31,9 +31,9 @@ class RefreshTokenRepository
         $this->model->revokeToken($tokenHash);
     }
 
-    public function revokeAllForUser(int $userId): void
+    public function revokeAllForUser(string $userUuid): void
     {
-        $this->model->revokeAllForUser($userId);
+        $this->model->revokeAllForUser($userUuid);
     }
 
     public function purgeExpired(): int

@@ -83,7 +83,7 @@ defined('EXIT__AUTO_MAX')      || define('EXIT__AUTO_MAX', 125);    // highest a
  | Application Constants
  |--------------------------------------------------------------------------
  |
- | Hằng số riêng của EduGame Platform.
+ | Hằng số riêng của BladeEngine Platform.
  | Tập trung giá trị lặp lại để dễ thay đổi và tránh magic strings.
  |
  */

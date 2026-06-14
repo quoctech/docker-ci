@@ -15,20 +15,11 @@ class CreateUsersTable extends Migration
     public function up(): void
     {
         $this->forge->addField([
-            // === Primary Key ===
-            'id' => [
-                'type'           => 'BIGINT',
-                'unsigned'       => true,
-                'auto_increment' => true,
-                'comment'        => 'ID nội bộ, không expose ra client',
-            ],
-
-            // === Identification ===
+            // === Primary Key (UUID) ===
             'uuid' => [
                 'type'       => 'CHAR',
                 'constraint' => 36,
-                'unique'     => true,
-                'comment'    => 'UUID v4 public identifier, dùng thay ID trong API response',
+                'comment'    => 'UUID v4 — primary key, định danh duy nhất public',
             ],
             'email' => [
                 'type'       => 'VARCHAR',
@@ -125,10 +116,10 @@ class CreateUsersTable extends Migration
             ],
         ]);
 
-        $this->forge->addPrimaryKey('id');
-        $this->forge->addKey('role');       // Index cho query filter theo role
-        $this->forge->addKey('status');     // Index cho query filter theo status
-        $this->forge->addKey('deleted_at'); // Index cho soft delete query
+        $this->forge->addPrimaryKey('uuid');
+        $this->forge->addKey('role');
+        $this->forge->addKey('status');
+        $this->forge->addKey('deleted_at');
         $this->forge->createTable('users', true);
     }
 

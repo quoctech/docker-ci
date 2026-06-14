@@ -55,7 +55,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // Module Management
         $routes->get('modules', '\Modules\SystemAdmin\Controllers\ModuleController::index');
-        $routes->put('modules/(:num)/toggle', '\Modules\SystemAdmin\Controllers\ModuleController::toggle/$1');
+        $routes->put('modules/(:segment)/toggle', '\Modules\SystemAdmin\Controllers\ModuleController::toggle/$1');
         $routes->post('modules/sync-cache', '\Modules\SystemAdmin\Controllers\ModuleController::syncCache');
 
         // Site Configs
@@ -67,12 +67,13 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // User Management
         $routes->get('users', '\Modules\SystemAdmin\Controllers\UserManagementController::index');
-        $routes->get('users/(:num)', '\Modules\SystemAdmin\Controllers\UserManagementController::show/$1');
+        $routes->get('users/(:segment)', '\Modules\SystemAdmin\Controllers\UserManagementController::show/$1');
         $routes->post('users', '\Modules\SystemAdmin\Controllers\UserManagementController::create');
-        $routes->put('users/(:num)', '\Modules\SystemAdmin\Controllers\UserManagementController::update/$1');
-        $routes->put('users/(:num)/status', '\Modules\SystemAdmin\Controllers\UserManagementController::updateStatus/$1');
-        $routes->put('users/(:num)/role', '\Modules\SystemAdmin\Controllers\UserManagementController::updateRole/$1');
-        $routes->post('users/(:num)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::uploadAvatar/$1');
-        $routes->delete('users/(:num)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::deleteAvatar/$1');
+        $routes->put('users/(:segment)', '\Modules\SystemAdmin\Controllers\UserManagementController::update/$1');
+        $routes->put('users/(:segment)/status', '\Modules\SystemAdmin\Controllers\UserManagementController::updateStatus/$1');
+        $routes->put('users/(:segment)/role', '\Modules\SystemAdmin\Controllers\UserManagementController::updateRole/$1');
+        $routes->put('users/(:segment)/reset-password', '\Modules\SystemAdmin\Controllers\UserManagementController::resetPassword/$1');
+        $routes->post('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::uploadAvatar/$1');
+        $routes->delete('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::deleteAvatar/$1');
     });
 });

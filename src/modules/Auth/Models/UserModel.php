@@ -13,18 +13,18 @@ use CodeIgniter\Model;
 class UserModel extends Model
 {
     protected $table            = 'users';
-    protected $primaryKey       = 'id';
-    protected $useAutoIncrement = true;
+    protected $primaryKey       = 'uuid';
+    protected $useAutoIncrement = false;
     protected $returnType       = 'object';
     protected $useSoftDeletes   = true;
     protected $useTimestamps    = true;
 
     /**
      * Các field cho phép mass-assignment.
-     * Không bao gồm id, uuid (auto-gen), timestamps (auto).
+     * Không bao gồm uuid (là PK, set qua beforeInsert hook), timestamps (auto).
      */
     protected $allowedFields = [
-        'uuid',                    // UUID v4 public identifier (thay thế expose ID)
+        'uuid',                    // UUID v4 — primary key
         'email',                   // Email đăng nhập, unique
         'username',                // Tên đăng nhập thay thế email, unique, nullable
         'phone',                   // Số điện thoại liên hệ
@@ -140,15 +140,14 @@ class UserModel extends Model
     }
 
     /**
-     * Tìm user active theo ID.
-     * Dùng khi verify JWT — chỉ cho phép user đang active.
+     * Tìm user active theo UUID (dùng cho JWT sub lookup).
      *
-     * @param int $id User ID
+     * @param string $uuid User UUID
      * @return object|null User nếu active, null nếu không tồn tại hoặc bị khóa
      */
-    public function findActiveById(int $id): ?object
+    public function findActiveByUuid(string $uuid): ?object
     {
-        return $this->where('id', $id)
+        return $this->where('uuid', $uuid)
                     ->where('status', STATUS_ACTIVE)
                     ->first();
     }
@@ -161,9 +160,9 @@ class UserModel extends Model
      * Ghi nhận đăng nhập thành công.
      * Reset bộ đếm failed attempts và cập nhật IP/thời gian.
      */
-    public function recordLogin(int $userId, string $ip): void
+    public function recordLogin(string $uuid, string $ip): void
     {
-        $this->update($userId, [
+        $this->update($uuid, [
             'last_login_at'         => now_datetime(),
             'last_login_ip'         => $ip,
             'failed_login_attempts' => 0,
@@ -175,19 +174,18 @@ class UserModel extends Model
      * Tăng bộ đếm đăng nhập sai.
      * Nếu >= MAX_LOGIN_ATTEMPTS lần sai liên tiếp, tự động khóa tạm.
      */
-    public function incrementFailedAttempts(int $userId): int
+    public function incrementFailedAttempts(string $uuid): int
     {
-        $user     = $this->find($userId);
+        $user     = $this->find($uuid);
         $attempts = ($user->failed_login_attempts ?? 0) + 1;
 
         $data = ['failed_login_attempts' => $attempts];
 
-        // Khóa tạm sau N lần sai (chống brute force)
         if ($attempts >= MAX_LOGIN_ATTEMPTS) {
             $data['locked_until'] = future_datetime('+' . LOCK_DURATION_MINUTES . ' minutes');
         }
 
-        $this->update($userId, $data);
+        $this->update($uuid, $data);
 
         return $attempts;
     }

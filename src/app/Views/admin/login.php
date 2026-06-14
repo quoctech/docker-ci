@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng nhập - EduGame Admin</title>
+    <title>Đăng nhập - BladeEngine Admin</title>
     <link rel="stylesheet" href="/assets/css/admin.css">
     <script defer src="/assets/js/alpine.min.js"></script>
 </head>
@@ -12,7 +12,7 @@
 <div class="login-page" x-data="loginForm()">
     <div class="login-card">
         <div class="login-card__logo">
-            <h1>⚡ EduGame</h1>
+            <h1>⚡ BladeEngine</h1>
             <p>Đăng nhập hệ thống quản trị</p>
         </div>
 

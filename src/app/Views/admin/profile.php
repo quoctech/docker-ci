@@ -112,20 +112,9 @@ function profileManager() {
 
         async saveProfile() {
             this.saving = true;
-            // Dùng API admin update user (tự update chính mình qua ID trong token)
-            const meData = await apiGet('/api/auth/me');
-            if (!meData || meData.status !== 'success') { this.saving = false; return; }
+            const myId = this.profile.uuid;
+            if (!myId) { this.saving = false; return; }
 
-            const userId = meData.data.uuid; // need actual ID
-            // Gọi API users list để lấy ID
-            const usersData = await apiGet('/api/admin/users?search=' + encodeURIComponent(this.profile.email));
-            if (!usersData || usersData.status !== 'success' || !usersData.data.users.length) {
-                showToast('error', 'Không tìm thấy tài khoản.');
-                this.saving = false;
-                return;
-            }
-
-            const myId = usersData.data.users[0].id;
             const body = new URLSearchParams({
                 full_name: this.form.full_name,
                 username: this.form.username,
@@ -169,10 +158,8 @@ function profileManager() {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Lấy user ID
-            const usersData = await apiGet('/api/admin/users?search=' + encodeURIComponent(this.profile.email));
-            if (!usersData || !usersData.data.users.length) return;
-            const myId = usersData.data.users[0].id;
+            const myId = this.profile.uuid;
+            if (!myId) return;
 
             const formData = new FormData();
             formData.append('avatar', file);
@@ -211,9 +198,8 @@ function profileManager() {
             });
             if (!confirmed) return;
 
-            const usersData = await apiGet('/api/admin/users?search=' + encodeURIComponent(this.profile.email));
-            if (!usersData || !usersData.data.users.length) return;
-            const myId = usersData.data.users[0].id;
+            const myId = this.profile.uuid;
+            if (!myId) return;
 
             const data = await apiDelete('/api/admin/users/' + myId + '/avatar');
             if (data && data.status === 'success') {

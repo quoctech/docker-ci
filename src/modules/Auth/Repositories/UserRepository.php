@@ -23,14 +23,14 @@ class UserRepository
     // LOOKUP
     // =========================================================================
 
-    public function findById(int $id): ?object
+    public function findByUuid(string $uuid): ?object
     {
-        return $this->model->find($id);
+        return $this->model->find($uuid);
     }
 
-    public function findActiveById(int $id): ?object
+    public function findActiveByUuid(string $uuid): ?object
     {
-        return $this->model->findActiveById($id);
+        return $this->model->findActiveByUuid($uuid);
     }
 
     public function findByEmail(string $email): ?object
@@ -58,34 +58,32 @@ class UserRepository
      * @param array $data Dữ liệu user (email, password_hash, full_name, role, status, ...)
      * @return int|false User ID hoặc false nếu thất bại
      */
-    public function create(array $data): int|false
+    public function create(array $data): string|false
     {
         return $this->model->insert($data);
     }
 
     /**
-     * Cập nhật user (skip validation — dùng khi admin update).
-     *
-     * @param int   $id   User ID
-     * @param array $data Fields cần update
+     * @param string $uuid User UUID
+     * @param array  $data Fields cần update
      */
-    public function update(int $id, array $data): void
+    public function update(string $uuid, array $data): void
     {
-        $this->model->skipValidation(true)->update($id, $data);
+        $this->model->skipValidation(true)->update($uuid, $data);
     }
 
     // =========================================================================
     // LOGIN TRACKING
     // =========================================================================
 
-    public function recordLogin(int $userId, string $ip): void
+    public function recordLogin(string $uuid, string $ip): void
     {
-        $this->model->recordLogin($userId, $ip);
+        $this->model->recordLogin($uuid, $ip);
     }
 
-    public function incrementFailedAttempts(int $userId): int
+    public function incrementFailedAttempts(string $uuid): int
     {
-        return $this->model->incrementFailedAttempts($userId);
+        return $this->model->incrementFailedAttempts($uuid);
     }
 
     public function isLocked(object $user): bool

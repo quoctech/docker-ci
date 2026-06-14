@@ -15,8 +15,9 @@ class CreateRefreshTokensTable extends Migration
                 'auto_increment' => true,
             ],
             'user_id' => [
-                'type'     => 'BIGINT',
-                'unsigned' => true,
+                'type'       => 'CHAR',
+                'constraint' => 36,
+                'comment'    => 'FK → users.uuid',
             ],
             'token_hash' => [
                 'type'       => 'VARCHAR',
@@ -44,7 +45,7 @@ class CreateRefreshTokensTable extends Migration
         $this->forge->addPrimaryKey('id');
         $this->forge->addKey('user_id');
         $this->forge->addKey('expires_at');
-        $this->forge->addForeignKey('user_id', 'users', 'id', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('user_id', 'users', 'uuid', 'CASCADE', 'CASCADE');
         $this->forge->createTable('refresh_tokens', true);
     }
 

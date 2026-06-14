@@ -8,20 +8,11 @@ class AddUsernameToUsers extends Migration
 {
     public function up(): void
     {
-        $this->forge->addColumn('users', [
-            'username' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 30,
-                'unique'     => true,
-                'null'       => true,
-                'after'      => 'email',
-                'comment'    => 'Tên đăng nhập duy nhất, dùng thay email khi login',
-            ],
-        ]);
+        // username đã có trong migration gốc CreateUsersTable — no-op
     }
 
     public function down(): void
     {
-        $this->forge->dropColumn('users', 'username');
+        // no-op
     }
 }

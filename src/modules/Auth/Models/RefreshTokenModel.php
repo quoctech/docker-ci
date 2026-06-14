@@ -20,7 +20,7 @@ class RefreshTokenModel extends Model
     protected $useTimestamps    = false;
 
     protected $allowedFields = [
-        'user_id',      // FK → users.id (owner của token)
+        'user_id',      // FK → users.uuid (owner của token)
         'token_hash',   // SHA-256 hash của refresh token (không lưu plaintext)
         'expires_at',   // Thời điểm hết hạn (7 ngày từ lúc tạo)
         'ip_address',   // IP tạo token (audit trail)
@@ -37,7 +37,7 @@ class RefreshTokenModel extends Model
      * @param string      $ip        IP address phát hành
      * @param string|null $userAgent Browser user-agent string
      */
-    public function storeToken(int $userId, string $tokenHash, string $expiresAt, string $ip, ?string $userAgent): void
+    public function storeToken(string $userId, string $tokenHash, string $expiresAt, string $ip, ?string $userAgent): void
     {
         $this->insert([
             'user_id'    => $userId,
@@ -85,7 +85,7 @@ class RefreshTokenModel extends Model
      *
      * @param int $userId User ID cần revoke hết
      */
-    public function revokeAllForUser(int $userId): void
+    public function revokeAllForUser(string $userId): void
     {
         $this->where('user_id', $userId)->delete();
     }

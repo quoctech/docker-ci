@@ -20,6 +20,7 @@ class InitialSeeder extends Seeder
         $this->seedModules();
         $this->seedSiteConfigs();
         $this->seedSuperAdmin();
+        $this->seedTestAccounts();
     }
 
     private function seedModules(): void
@@ -60,18 +61,18 @@ class InitialSeeder extends Seeder
 
         $configs = [
             // Cài đặt chung
-            ['key' => 'site_name',        'value' => 'EduGame Platform',                        'group' => 'general', 'type' => 'string',  'description' => 'Tên website hiển thị'],
-            ['key' => 'site_description', 'value' => 'Nền tảng giáo dục game hóa',             'group' => 'general', 'type' => 'string',  'description' => 'Mô tả ngắn về website'],
+            ['key' => 'site_name',        'value' => 'BladeEngine',                             'group' => 'general', 'type' => 'string',  'description' => 'Tên website hiển thị'],
+            ['key' => 'site_description', 'value' => 'Nền tảng module hóa BladeEngine',        'group' => 'general', 'type' => 'string',  'description' => 'Mô tả ngắn về website'],
             ['key' => 'site_logo',        'value' => '',                                        'group' => 'general', 'type' => 'string',  'description' => 'URL logo website'],
             ['key' => 'site_favicon',     'value' => '',                                        'group' => 'general', 'type' => 'string',  'description' => 'URL favicon'],
-            ['key' => 'meta_title',       'value' => 'EduGame - Học mà chơi, chơi mà học',     'group' => 'general', 'type' => 'string',  'description' => 'Meta title cho SEO'],
-            ['key' => 'meta_description', 'value' => 'Nền tảng giáo dục game hóa bám sát SGK', 'group' => 'general', 'type' => 'string',  'description' => 'Meta description cho SEO'],
+            ['key' => 'meta_title',       'value' => 'BladeEngine - Core Module Platform',      'group' => 'general', 'type' => 'string',  'description' => 'Meta title cho SEO'],
+            ['key' => 'meta_description', 'value' => 'Nền tảng phát triển module BladeEngine',  'group' => 'general', 'type' => 'string',  'description' => 'Meta description cho SEO'],
             ['key' => 'maintenance_mode', 'value' => '0',                                      'group' => 'general', 'type' => 'boolean', 'description' => 'Bật chế độ bảo trì (tạm đóng website)'],
             ['key' => 'register_enabled', 'value' => '1',                                      'group' => 'general', 'type' => 'boolean', 'description' => 'Cho phép đăng ký tài khoản mới'],
 
             // Liên hệ
             ['key' => 'hotline',       'value' => '',                  'group' => 'contact', 'type' => 'string', 'description' => 'Số hotline hỗ trợ'],
-            ['key' => 'support_email', 'value' => 'support@edugame.vn', 'group' => 'contact', 'type' => 'string', 'description' => 'Email hỗ trợ khách hàng'],
+            ['key' => 'support_email', 'value' => 'support@bladeengine.local', 'group' => 'contact', 'type' => 'string', 'description' => 'Email hỗ trợ khách hàng'],
             ['key' => 'phone',         'value' => '',                  'group' => 'contact', 'type' => 'string', 'description' => 'Số điện thoại liên hệ'],
             ['key' => 'address',       'value' => '',                  'group' => 'contact', 'type' => 'string', 'description' => 'Địa chỉ văn phòng'],
             ['key' => 'facebook',      'value' => '',                  'group' => 'contact', 'type' => 'string', 'description' => 'Link Facebook fanpage'],
@@ -97,15 +98,59 @@ class InitialSeeder extends Seeder
 
         $this->db->table('users')->insert([
             'uuid'          => $uuid,
-            'email'         => 'admin@edugame.local',
+            'email'         => 'admin@bladeengine.local',
             'username'      => 'administrator',
             'phone'         => '0900000000',
             'password_hash' => hash_password('123456'),
-            'full_name'     => 'Administrator',
+            'full_name'     => 'Super Administrator',
             'role'          => ROLE_SUPER_ADMIN,
             'status'        => STATUS_ACTIVE,
             'created_at'    => $now,
             'updated_at'    => $now,
         ]);
+    }
+
+    private function seedTestAccounts(): void
+    {
+        $now = now_datetime();
+
+        $accounts = [
+            [
+                'email'     => 'teacher@bladeengine.local',
+                'username'  => 'teacher01',
+                'phone'     => '0911000001',
+                'password'  => 'Test@123',
+                'full_name' => 'Nguyễn Thị Giáo Viên',
+                'role'      => ROLE_WORKSPACE_ADMIN,
+            ],
+            [
+                'email'     => 'student@bladeengine.local',
+                'username'  => 'student01',
+                'phone'     => '0922000002',
+                'password'  => 'Test@123',
+                'full_name' => 'Trần Văn Học Sinh',
+                'role'      => ROLE_USER,
+            ],
+        ];
+
+        foreach ($accounts as $account) {
+            $data    = random_bytes(16);
+            $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+            $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+            $uuid    = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+
+            $this->db->table('users')->insert([
+                'uuid'          => $uuid,
+                'email'         => $account['email'],
+                'username'      => $account['username'],
+                'phone'         => $account['phone'],
+                'password_hash' => hash_password($account['password']),
+                'full_name'     => $account['full_name'],
+                'role'          => $account['role'],
+                'status'        => STATUS_ACTIVE,
+                'created_at'    => $now,
+                'updated_at'    => $now,
+            ]);
+        }
     }
 }

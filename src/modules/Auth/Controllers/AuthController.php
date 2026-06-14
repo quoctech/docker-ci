@@ -43,6 +43,9 @@ class AuthController extends ApiController
      */
     public function register(): ResponseInterface
     {
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getPost();
+
         $rules = [
             'email'     => 'required|valid_email|max_length[254]|is_unique[users.email]',
             'username'  => 'permit_empty|alpha_numeric|min_length[3]|max_length[30]|is_unique[users.username]',
@@ -51,11 +54,11 @@ class AuthController extends ApiController
             'phone'     => 'permit_empty|max_length[20]|regex_match[/^\+?[0-9\s\-]+$/]',
         ];
 
-        if (! $this->validate($rules)) {
+        if (! $this->validateData($input, $rules)) {
             return $this->error('Validation failed.', 422, $this->validator->getErrors());
         }
 
-        $email = strtolower(trim($this->request->getPost('email')));
+        $email = strtolower(trim($input['email'] ?? ''));
 
         // Rate limit: chặn spam đăng ký
         $remaining = RedisService::rateLimit(
@@ -69,17 +72,19 @@ class AuthController extends ApiController
         }
 
         // Chuẩn bị dữ liệu insert
+        $rawPhone = $input['phone'] ?? null;
+
         $insertData = [
             'email'         => $email,
-            'password_hash' => hash_password($this->request->getPost('password')),
-            'full_name'     => trim($this->request->getPost('full_name')),
-            'phone'         => $this->request->getPost('phone'),
+            'password_hash' => hash_password($input['password'] ?? ''),
+            'full_name'     => trim($input['full_name'] ?? ''),
+            'phone'         => $rawPhone ? preg_replace('/[\s\-]/', '', trim($rawPhone)) : null,
             'role'          => ROLE_USER,
             'status'        => STATUS_ACTIVE,
         ];
 
         // Username là optional — nếu có thì lưu lowercase
-        $username = $this->request->getPost('username');
+        $username = $input['username'] ?? null;
         if (! empty($username)) {
             $insertData['username'] = strtolower(trim($username));
         }
@@ -116,17 +121,21 @@ class AuthController extends ApiController
      */
     public function login(): ResponseInterface
     {
+        // Hỗ trợ cả JSON body lẫn form-encoded
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getPost();
+
         $rules = [
             'identifier' => 'required|min_length[3]|max_length[254]',
             'password'   => 'required',
         ];
 
-        if (! $this->validate($rules)) {
+        if (! $this->validateData($input, $rules)) {
             return $this->error('Validation failed.', 422, $this->validator->getErrors());
         }
 
         $ip         = $this->request->getIPAddress();
-        $identifier = trim($this->request->getPost('identifier'));
+        $identifier = trim($input['identifier'] ?? '');
 
         // Rate limit: 10 lần thử đăng nhập / phút / IP
         $remaining = RedisService::rateLimit("login:{$ip}", LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW);
@@ -153,9 +162,8 @@ class AuthController extends ApiController
         }
 
         // Xác minh mật khẩu
-        if (! verify_password($this->request->getPost('password'), $user->password_hash)) {
-            // Tăng bộ đếm sai, có thể trigger lock
-            $this->userModel->incrementFailedAttempts($user->id);
+        if (! verify_password($input['password'] ?? '', $user->password_hash)) {
+            $this->userModel->incrementFailedAttempts($user->uuid);
             RedisService::incrementLoginAttempt($ip);
 
             return $this->error('Invalid credentials.', 401);
@@ -165,25 +173,22 @@ class AuthController extends ApiController
 
         // Sinh JWT access token (ngắn hạn, 15 phút)
         $accessToken = $this->jwt->generateAccessToken([
-            'id'   => (int) $user->id,
-            'uuid' => $user->uuid,
+            'id'   => $user->uuid,   // UUID là sub trong JWT
             'role' => $user->role,
         ]);
 
         // Sinh refresh token (dài hạn, 7 ngày, lưu DB)
         $refreshToken = $this->jwt->generateRefreshToken();
 
-        // Lưu refresh token hash vào DB (không lưu token gốc)
         $this->refreshModel->storeToken(
-            $user->id,
+            $user->uuid,
             $refreshToken['hash'],
             timestamp_to_datetime($refreshToken['expires_at']),
             $ip,
             $this->request->getUserAgent()->getAgentString()
         );
 
-        // Ghi nhận login thành công, reset failed attempts
-        $this->userModel->recordLogin($user->id, $ip);
+        $this->userModel->recordLogin($user->uuid, $ip);
         RedisService::clearLoginAttempts($ip);
 
         // Gửi refresh token qua HttpOnly cookie (client không đọc được bằng JS)
@@ -239,8 +244,7 @@ class AuthController extends ApiController
             return $this->error('Invalid or expired refresh token.', 401);
         }
 
-        // Verify user vẫn active (có thể bị lock giữa chừng)
-        $user = $this->userModel->findActiveById($storedToken->user_id);
+        $user = $this->userModel->findActiveByUuid($storedToken->user_id);
 
         if (! $user) {
             $this->refreshModel->revokeToken($tokenHash);
@@ -251,15 +255,14 @@ class AuthController extends ApiController
         $this->refreshModel->revokeToken($tokenHash);
 
         $accessToken = $this->jwt->generateAccessToken([
-            'id'   => (int) $user->id,
-            'uuid' => $user->uuid,
+            'id'   => $user->uuid,
             'role' => $user->role,
         ]);
 
         $newRefresh = $this->jwt->generateRefreshToken();
 
         $this->refreshModel->storeToken(
-            $user->id,
+            $user->uuid,
             $newRefresh['hash'],
             timestamp_to_datetime($newRefresh['expires_at']),
             $this->request->getIPAddress(),
@@ -331,10 +334,7 @@ class AuthController extends ApiController
         $authUser = $this->getAuthUser();
 
         if ($authUser) {
-            // Xóa hết refresh token trong DB
             $this->refreshModel->revokeAllForUser($authUser->sub);
-
-            // Xóa hết session keys trong Redis → token cũ invalid ngay lập tức
             RedisService::revokeAllSessions($authUser->sub);
         }
 
@@ -353,7 +353,7 @@ class AuthController extends ApiController
     public function me(): ResponseInterface
     {
         $authUser = $this->getAuthUser();
-        $user     = $this->userModel->findActiveById($authUser->sub);
+        $user     = $this->userModel->findActiveByUuid($authUser->sub);
 
         if (! $user) {
             return $this->error('User not found.', 404);
@@ -383,31 +383,31 @@ class AuthController extends ApiController
      */
     public function changePassword(): ResponseInterface
     {
+        $isJson = str_contains($this->request->getHeaderLine('Content-Type'), 'application/json');
+        $input  = $isJson ? (array) $this->request->getJSON(true) : $this->request->getPost();
+
         $rules = [
             'current_password' => 'required',
             'new_password'     => 'required|min_length[4]|max_length[72]',
         ];
 
-        if (! $this->validate($rules)) {
+        if (! $this->validateData($input, $rules)) {
             return $this->error('Validation failed.', 422, $this->validator->getErrors());
         }
 
         $authUser = $this->getAuthUser();
-        $user     = $this->userModel->find($authUser->sub);
+        $user     = $this->userModel->find($authUser->sub); // PK = uuid, find by uuid
 
-        // Verify mật khẩu hiện tại trước khi cho đổi
-        if (! verify_password($this->request->getPost('current_password'), $user->password_hash)) {
+        if (! verify_password($input['current_password'] ?? '', $user->password_hash)) {
             return $this->error('Current password is incorrect.', 401);
         }
 
-        // Hash mật khẩu mới bằng Argon2id (chống GPU cracking)
-        $this->userModel->update($user->id, [
-            'password_hash' => hash_password($this->request->getPost('new_password')),
+        $this->userModel->update($user->uuid, [
+            'password_hash' => hash_password($input['new_password'] ?? ''),
         ]);
 
-        // Hủy toàn bộ session — buộc đăng nhập lại (bảo mật: nếu bị lộ mật khẩu cũ)
-        $this->refreshModel->revokeAllForUser($user->id);
-        RedisService::revokeAllSessions($user->id);
+        $this->refreshModel->revokeAllForUser($user->uuid);
+        RedisService::revokeAllSessions($user->uuid);
 
         return $this->success(null, 'Password changed. Please login again.');
     }

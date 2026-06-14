@@ -75,11 +75,11 @@ abstract class ApiController extends BaseController
     }
 
     /**
-     * Lấy user ID từ JWT payload (shortcut).
+     * Lấy user UUID từ JWT payload (shortcut).
      *
-     * @return int|null User ID hoặc null nếu chưa login
+     * @return string|null User UUID hoặc null nếu chưa login
      */
-    protected function getAuthUserId(): ?int
+    protected function getAuthUserId(): ?string
     {
         return $this->getAuthUser()?->sub ?? null;
     }

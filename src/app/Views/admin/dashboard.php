@@ -7,7 +7,7 @@
 <?= $this->section('content') ?>
 
 <h1 class="content__title">Tổng quan</h1>
-<p class="content__subtitle">Bảng điều khiển hệ thống EduGame Platform</p>
+<p class="content__subtitle">Bảng điều khiển hệ thống BladeEngine</p>
 
 <div class="grid grid--3" x-data="dashboardStats()" x-init="load()">
     <div class="card">

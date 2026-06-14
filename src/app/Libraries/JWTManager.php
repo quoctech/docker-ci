@@ -71,14 +71,12 @@ class JWTManager
             'iat'  => $now,
             'exp'  => $now + $this->accessTtl,
             'jti'  => $jti,
-            'sub'  => $userData['id'],
-            'uuid' => $userData['uuid'],
+            'sub'  => $userData['id'],   // UUID string
             'role' => $userData['role'],
         ];
 
         $token = JWT::encode($payload, $this->secretKey, $this->algorithm);
 
-        // Đăng ký session vào Redis (tracking active sessions)
         RedisService::setUserSession($userData['id'], $jti, $this->accessTtl);
 
         return [

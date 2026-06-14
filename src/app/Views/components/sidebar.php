@@ -1,6 +1,6 @@
 <aside class="sidebar" :class="{ 'sidebar--open': sidebarOpen }">
     <div class="sidebar__brand">
-        <h2>⚡ EduGame</h2>
+        <h2>⚡ BladeEngine</h2>
     </div>
 
     <ul class="sidebar__nav">
@@ -28,14 +28,7 @@
             </ul>
         </li>
 
-        <li class="sidebar__nav-group">
-            <div class="sidebar__nav-label">Tài khoản</div>
-            <ul>
-                <li class="sidebar__nav-item">
-                    <a href="#" @click.prevent="logout()">↪ Đăng xuất</a>
-                </li>
-            </ul>
-        </li>
+
     </ul>
 
     <!-- Version -->

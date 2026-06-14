@@ -84,23 +84,20 @@ class RedisService
      * @param string $jti    JWT ID của session này
      * @param int    $ttl    Thời gian sống (= access token TTL)
      */
-    public static function setUserSession(int $userId, string $jti, int $ttl): void
+    public static function setUserSession(string $userUuid, string $jti, int $ttl): void
     {
-        self::getInstance()->setex(REDIS_PREFIX_SESSION . "{$userId}:{$jti}", $ttl, '1');
+        self::getInstance()->setex(REDIS_PREFIX_SESSION . "{$userUuid}:{$jti}", $ttl, '1');
     }
 
     /**
      * Hủy toàn bộ session của 1 user (logout everywhere).
      *
-     * Dùng khi: admin lock account, user đổi password, logout-all.
-     * Scan tất cả key matching pattern rồi xóa hàng loạt.
-     *
-     * @param int $userId User ID cần revoke hết session
+     * @param string $userUuid User UUID
      */
-    public static function revokeAllSessions(int $userId): void
+    public static function revokeAllSessions(string $userUuid): void
     {
         $redis = self::getInstance();
-        $keys  = $redis->keys(REDIS_PREFIX_SESSION . "{$userId}:*");
+        $keys  = $redis->keys(REDIS_PREFIX_SESSION . "{$userUuid}:*");
 
         if (! empty($keys)) {
             $redis->del($keys);

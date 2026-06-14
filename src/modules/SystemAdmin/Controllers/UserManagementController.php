@@ -52,11 +52,11 @@ class UserManagementController extends ApiController
     }
 
     /**
-     * GET /api/admin/users/(:num)
+     * GET /api/admin/users/(:segment)
      */
-    public function show(int $id): ResponseInterface
+    public function show(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -98,26 +98,26 @@ class UserManagementController extends ApiController
 
         $phone = $this->request->getVar('phone');
         if (! empty($phone)) {
-            $data['phone'] = trim($phone);
+            $data['phone'] = preg_replace('/[\s\-]/', '', trim($phone));
         }
 
-        $userId = $this->userRepo->create($data);
+        $userUuid = $this->userRepo->create($data);
 
-        if (! $userId) {
+        if (! $userUuid) {
             return $this->error('Tạo người dùng thất bại.', 500);
         }
 
-        $user = $this->userRepo->findById($userId);
+        $user = $this->userRepo->findByUuid($userUuid);
 
         return $this->success($this->formatUser($user), 'Đã tạo người dùng.', 201);
     }
 
     /**
-     * PUT /api/admin/users/(:num)
+     * PUT /api/admin/users/(:segment)
      */
-    public function update(int $id): ResponseInterface
+    public function update(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -131,14 +131,15 @@ class UserManagementController extends ApiController
         }
 
         if (isset($input['phone'])) {
-            $data['phone'] = trim($input['phone']);
+            $raw = trim($input['phone']);
+            $data['phone'] = $raw !== '' ? preg_replace('/[\s\-]/', '', $raw) : null;
         }
 
         if (isset($input['username'])) {
             $username = strtolower(trim($input['username']));
             if (! empty($username)) {
                 $existing = $this->userRepo->findByUsername($username);
-                if ($existing && (int) $existing->id !== $id) {
+                if ($existing && $existing->uuid !== $uuid) {
                     return $this->error('Username đã tồn tại.', 422);
                 }
             }
@@ -149,18 +150,18 @@ class UserManagementController extends ApiController
             return $this->error('Không có dữ liệu cập nhật.', 400);
         }
 
-        $this->userRepo->update($id, $data);
-        $user = $this->userRepo->findById($id);
+        $this->userRepo->update($uuid, $data);
+        $user = $this->userRepo->findByUuid($uuid);
 
         return $this->success($this->formatUser($user), 'Đã cập nhật người dùng.');
     }
 
     /**
-     * PUT /api/admin/users/(:num)/status
+     * PUT /api/admin/users/(:segment)/status
      */
-    public function updateStatus(int $id): ResponseInterface
+    public function updateStatus(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -177,22 +178,22 @@ class UserManagementController extends ApiController
             return $this->error('Trạng thái không hợp lệ.', 422);
         }
 
-        $this->userRepo->update($id, ['status' => $newStatus]);
+        $this->userRepo->update($uuid, ['status' => $newStatus]);
 
         if ($newStatus === STATUS_LOCKED) {
-            RedisService::revokeAllSessions($id);
-            $this->tokenRepo->revokeAllForUser($id);
+            RedisService::revokeAllSessions($uuid);
+            $this->tokenRepo->revokeAllForUser($uuid);
         }
 
-        return $this->success(['id' => $id, 'status' => $newStatus], 'Đã cập nhật trạng thái.');
+        return $this->success(['uuid' => $uuid, 'status' => $newStatus], 'Đã cập nhật trạng thái.');
     }
 
     /**
-     * PUT /api/admin/users/(:num)/role
+     * PUT /api/admin/users/(:segment)/role
      */
-    public function updateRole(int $id): ResponseInterface
+    public function updateRole(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -209,20 +210,48 @@ class UserManagementController extends ApiController
             return $this->error('Chỉ Super Admin mới có thể phân quyền Super Admin.', 403);
         }
 
-        $this->userRepo->update($id, ['role' => $newRole]);
+        $this->userRepo->update($uuid, ['role' => $newRole]);
 
-        RedisService::revokeAllSessions($id);
-        $this->tokenRepo->revokeAllForUser($id);
+        RedisService::revokeAllSessions($uuid);
+        $this->tokenRepo->revokeAllForUser($uuid);
 
-        return $this->success(['id' => $id, 'role' => $newRole], 'Đã cập nhật quyền.');
+        return $this->success(['uuid' => $uuid, 'role' => $newRole], 'Đã cập nhật quyền.');
     }
 
     /**
-     * POST /api/admin/users/(:num)/avatar
+     * PUT /api/admin/users/(:segment)/reset-password
      */
-    public function uploadAvatar(int $id): ResponseInterface
+    public function resetPassword(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
+
+        if (! $user) {
+            return $this->error('Không tìm thấy người dùng.', 404);
+        }
+
+        $input       = $this->request->getRawInput();
+        $newPassword = $input['new_password'] ?? '';
+
+        if (empty($newPassword) || mb_strlen($newPassword) < 4 || mb_strlen($newPassword) > 72) {
+            return $this->error('Mật khẩu phải từ 4 đến 72 ký tự.', 422);
+        }
+
+        $this->userRepo->update($uuid, [
+            'password_hash' => hash_password($newPassword),
+        ]);
+
+        RedisService::revokeAllSessions($uuid);
+        $this->tokenRepo->revokeAllForUser($uuid);
+
+        return $this->success(null, 'Đã đặt lại mật khẩu. Người dùng cần đăng nhập lại.');
+    }
+
+    /**
+     * POST /api/admin/users/(:segment)/avatar
+     */
+    public function uploadAvatar(string $uuid): ResponseInterface
+    {
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -253,7 +282,7 @@ class UserManagementController extends ApiController
         $newName = $file->getRandomName();
         $file->move(WRITEPATH . 'uploads/avatars/', $newName);
 
-        $this->userRepo->update($id, ['avatar' => $newName]);
+        $this->userRepo->update($uuid, ['avatar' => $newName]);
 
         return $this->success([
             'avatar'     => $newName,
@@ -262,11 +291,11 @@ class UserManagementController extends ApiController
     }
 
     /**
-     * DELETE /api/admin/users/(:num)/avatar
+     * DELETE /api/admin/users/(:segment)/avatar
      */
-    public function deleteAvatar(int $id): ResponseInterface
+    public function deleteAvatar(string $uuid): ResponseInterface
     {
-        $user = $this->userRepo->findById($id);
+        $user = $this->userRepo->findByUuid($uuid);
 
         if (! $user) {
             return $this->error('Không tìm thấy người dùng.', 404);
@@ -277,19 +306,15 @@ class UserManagementController extends ApiController
             if (is_file($path)) {
                 unlink($path);
             }
-            $this->userRepo->update($id, ['avatar' => null]);
+            $this->userRepo->update($uuid, ['avatar' => null]);
         }
 
         return $this->success(null, 'Đã xóa avatar.');
     }
 
-    /**
-     * Format user cho response — KHÔNG trả password_hash, security fields.
-     */
     private function formatUser(object $u): array
     {
         return [
-            'id'         => (int) $u->id,
             'uuid'       => $u->uuid,
             'email'      => $u->email,
             'username'   => $u->username,
