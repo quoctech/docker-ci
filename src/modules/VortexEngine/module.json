@@ -1,0 +1,10 @@
+{
+  "slug": "vortex-engine",
+  "name": "Quản lý gói học",
+  "description": "Quản lý gói đăng ký học viên: dùng thử, VIP, hết hạn.",
+  "version": "1.0.1",
+  "is_core": false,
+  "admin_url": "/admin/subscriptions",
+  "icon": "💎",
+  "sort_order": 10
+}

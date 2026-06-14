@@ -21,6 +21,8 @@ class ModuleModel extends Model
         'is_core',
         'version',
         'sort_order',
+        'admin_url',
+        'icon',
     ];
 
     protected $validationRules = [
@@ -75,6 +77,18 @@ class ModuleModel extends Model
         RedisService::setModuleStatus($slug, $enabled);
 
         return $enabled;
+    }
+
+    /**
+     * Lấy các module đang bật có admin_url để hiển thị trên sidebar.
+     */
+    public function getEnabledWithAdminUrl(): array
+    {
+        return $this->where('is_enabled', 1)
+                    ->where('is_core', 0)
+                    ->where('admin_url IS NOT NULL', null, false)
+                    ->orderBy('sort_order', 'ASC')
+                    ->findAll();
     }
 
     /**

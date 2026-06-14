@@ -1,0 +1,10 @@
+{
+  "slug": "auth",
+  "name": "Xác thực & Bảo mật",
+  "description": "JWT authentication, quản lý phiên đăng nhập, rate limiting.",
+  "version": "1.0.0",
+  "is_core": true,
+  "admin_url": null,
+  "icon": "🔐",
+  "sort_order": 1
+}

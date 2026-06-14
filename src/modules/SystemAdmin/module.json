@@ -1,0 +1,10 @@
+{
+  "slug": "system-admin",
+  "name": "Quản trị Hệ thống",
+  "description": "Quản lý module, cấu hình website, tài khoản người dùng.",
+  "version": "1.0.0",
+  "is_core": true,
+  "admin_url": null,
+  "icon": "⚙️",
+  "sort_order": 2
+}

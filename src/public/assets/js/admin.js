@@ -36,10 +36,15 @@ async function apiDelete(url) {
     return apiRequest(url, { method: 'DELETE' });
 }
 
+function redirectToLogin() {
+    const current = window.location.pathname + window.location.search;
+    window.location.href = '/admin/login?redirect=' + encodeURIComponent(current);
+}
+
 async function apiRequest(url, options = {}) {
     const token = getToken();
     if (!token) {
-        window.location.href = '/admin/login';
+        redirectToLogin();
         return null;
     }
     options.headers = { ...options.headers, 'Authorization': 'Bearer ' + token };
@@ -48,7 +53,7 @@ async function apiRequest(url, options = {}) {
         if (res.status === 401) {
             localStorage.removeItem('access_token');
             localStorage.removeItem('user');
-            window.location.href = '/admin/login';
+            redirectToLogin();
             return null;
         }
         return await res.json();
@@ -116,7 +121,7 @@ function adminApp() {
         init() {
             const token = getToken();
             if (!token) {
-                window.location.href = '/admin/login';
+                redirectToLogin();
                 return;
             }
             const userStr = localStorage.getItem('user');

@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<div class="login-page" x-data="loginForm()">
+<div class="login-page" x-data="loginForm()" x-init="checkAlreadyLoggedIn()">
     <div class="login-card">
         <div class="login-card__logo">
             <h1>⚡ BladeEngine</h1>
@@ -60,6 +60,21 @@
 </div>
 
 <script>
+function checkAlreadyLoggedIn() {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    window.location.replace(safeRedirect(redirect));
+}
+
+function safeRedirect(url) {
+    // Chỉ cho phép redirect nội bộ /admin/*
+    if (url && url.startsWith('/admin') && !url.startsWith('/admin/login')) {
+        return url;
+    }
+    return '/admin';
+}
+
 function loginForm() {
     return {
         form: { identifier: '', password: '' },
@@ -83,14 +98,12 @@ function loginForm() {
                 const data = await res.json();
 
                 if (data.status === 'success') {
-                    // Lưu token và thông tin user
                     localStorage.setItem('access_token', data.data.access_token);
                     localStorage.setItem('user', JSON.stringify(data.data.user));
 
-                    // Chuyển trang admin
-                    window.location.href = '/admin';
+                    const redirect = new URLSearchParams(window.location.search).get('redirect');
+                    window.location.href = safeRedirect(redirect);
                 } else {
-                    // Hiển thị lỗi
                     if (data.errors) {
                         this.errors = data.errors;
                     } else {

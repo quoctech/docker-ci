@@ -68,4 +68,13 @@ class AdminPageController extends BaseController
     {
         return view('admin/profile');
     }
+
+    /**
+     * GET /admin/subscriptions
+     * Trang quản lý gói học (VortexEngine).
+     */
+    public function subscriptions(): string
+    {
+        return view('admin/subscriptions/index');
+    }
 }

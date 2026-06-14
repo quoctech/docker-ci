@@ -40,4 +40,19 @@ class ModuleRepository
     {
         $this->model->syncAllToRedis();
     }
+
+    public function getEnabledWithAdminUrl(): array
+    {
+        return $this->model->getEnabledWithAdminUrl();
+    }
+
+    public function findBySlug(string $slug): ?object
+    {
+        return $this->model->where('slug', $slug)->first();
+    }
+
+    public function install(array $data): void
+    {
+        $this->model->insert($data);
+    }
 }

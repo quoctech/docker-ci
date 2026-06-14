@@ -18,6 +18,7 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('configs', '\Modules\SystemAdmin\Controllers\AdminPageController::configs');
     $routes->get('users', '\Modules\SystemAdmin\Controllers\AdminPageController::users');
     $routes->get('profile', '\Modules\SystemAdmin\Controllers\AdminPageController::profile');
+    $routes->get('subscriptions', '\Modules\SystemAdmin\Controllers\AdminPageController::subscriptions', ['filter' => 'module_redirect:vortex-engine']);
 });
 
 // Serve uploaded files (avatar)
@@ -55,8 +56,10 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // Module Management
         $routes->get('modules', '\Modules\SystemAdmin\Controllers\ModuleController::index');
-        $routes->put('modules/(:segment)/toggle', '\Modules\SystemAdmin\Controllers\ModuleController::toggle/$1');
+        $routes->put('modules/(:num)/toggle', '\Modules\SystemAdmin\Controllers\ModuleController::toggle/$1');
+        $routes->post('modules/scan', '\Modules\SystemAdmin\Controllers\ModuleController::scan');
         $routes->post('modules/sync-cache', '\Modules\SystemAdmin\Controllers\ModuleController::syncCache');
+        $routes->post('modules/(:segment)/install', '\Modules\SystemAdmin\Controllers\ModuleController::install/$1');
 
         // Site Configs
         $routes->get('configs', '\Modules\SystemAdmin\Controllers\SiteConfigController::index');
@@ -64,6 +67,16 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->post('configs', '\Modules\SystemAdmin\Controllers\SiteConfigController::create');
         $routes->put('configs/(:any)', '\Modules\SystemAdmin\Controllers\SiteConfigController::update/$1');
         $routes->delete('configs/(:any)', '\Modules\SystemAdmin\Controllers\SiteConfigController::delete/$1');
+
+        // VortexEngine — Subscription Management
+        $routes->group('subscriptions', ['filter' => 'module_check:vortex-engine'], function ($routes) {
+            $routes->post('activate', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::activate');
+            $routes->get('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::packages');
+            $routes->get('packages/all', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::allPackages');
+            $routes->post('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::createPackage');
+            $routes->put('packages/(:segment)/toggle', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::togglePackage/$1');
+            $routes->put('packages/(:segment)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updatePackage/$1');
+        });
 
         // User Management
         $routes->get('users', '\Modules\SystemAdmin\Controllers\UserManagementController::index');

@@ -121,3 +121,12 @@ defined('REDIS_PREFIX_LOGIN')      || define('REDIS_PREFIX_LOGIN', 'login:attemp
 defined('REDIS_PREFIX_RATE')       || define('REDIS_PREFIX_RATE', 'rate:');
 defined('REDIS_KEY_MODULES')      || define('REDIS_KEY_MODULES', 'modules:status');
 defined('REDIS_KEY_SITE_CONFIG')  || define('REDIS_KEY_SITE_CONFIG', 'site:config');
+
+// --- VortexEngine: Subscription Engine ---
+defined('SUB_STATUS_TRIAL')   || define('SUB_STATUS_TRIAL', 'TRIAL');
+defined('SUB_STATUS_VIP')     || define('SUB_STATUS_VIP', 'VIP');
+defined('SUB_STATUS_EXPIRED') || define('SUB_STATUS_EXPIRED', 'EXPIRED');
+
+// Redis key pattern: sub:student:{student_id}
+defined('REDIS_PREFIX_SUBSCRIPTION') || define('REDIS_PREFIX_SUBSCRIPTION', 'sub:student:');
+defined('SUBSCRIPTION_CACHE_TTL')    || define('SUBSCRIPTION_CACHE_TTL', 300); // 5 phút

@@ -16,6 +16,8 @@ use Modules\Auth\Filters\JWTAuthFilter;
 use Modules\Auth\Filters\RateLimitFilter;
 use Modules\Auth\Filters\SecurityHeadersFilter;
 use Modules\Auth\Filters\ModuleCheckFilter;
+use Modules\Auth\Filters\ModuleRedirectFilter;
+use Modules\VortexEngine\Filters\SubscriptionFilter;
 
 class Filters extends BaseFilters
 {
@@ -36,6 +38,8 @@ class Filters extends BaseFilters
         'ratelimit'       => RateLimitFilter::class,
         'security_headers' => SecurityHeadersFilter::class,
         'module_check'    => ModuleCheckFilter::class,
+        'module_redirect' => ModuleRedirectFilter::class,
+        'subscription'    => SubscriptionFilter::class,
     ];
 
     /**
