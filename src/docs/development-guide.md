@@ -83,11 +83,12 @@ use Modules\AwesomeBar\Repositories\AwesomeBarItemRepository;
 
 1. Tạo thư mục `src/modules/<ModuleName>/` với cấu trúc:
    ```
-   Controllers/   — API controllers
-   Models/        — CI4 Models
-   Repositories/  — Data access layer
-   Filters/       — CI4 Filters (nếu cần)
-   docs/          — Tài liệu module
+   Controllers/         — API controllers + PageController (nếu có UI)
+   Models/              — CI4 Models
+   Repositories/        — Data access layer
+   Views/               — View files của module (BẮT BUỘC nằm ở đây, không để ở app/Views)
+   Filters/             — CI4 Filters (nếu cần)
+   docs/                — Tài liệu module
    ```
 
 2. Viết migration trong `src/app/Database/Migrations/` với tên:
@@ -101,11 +102,92 @@ use Modules\AwesomeBar\Repositories\AwesomeBarItemRepository;
 
 4. Đăng ký routes trong `src/app/Config/Routes.php`.
 
-5. Thêm trang admin vào `AdminPageController::tenModule()` và `Routes.php`.
+5. Tạo `<ModuleName>PageController` trong `Controllers/` của module, đặt view
+   bằng namespace path (xem quy tắc Views bên dưới). **Không thêm method vào
+   `AdminPageController`** — controller đó chỉ phục vụ module `SystemAdmin`.
 
 6. **Đăng ký Awesome Bar items** (xem quy tắc ở trên).
 
 7. Ghi log với `SystemLogger` khi có lỗi trong controller/service.
+
+---
+
+## Quy tắc Views — View phải nằm trong module
+
+> **Mọi view file đều phải đặt trong thư mục `Views/` của module sở hữu nó.**
+> Không được đặt view của module trong `src/app/Views/`.
+
+### Phân loại
+
+| Nơi đặt | Chứa gì |
+|---|---|
+| `src/modules/<Module>/Views/` | View riêng của module đó |
+| `src/app/Views/layouts/` | Shared layout dùng chung cho toàn bộ admin shell |
+| `src/app/Views/components/` | Shared partials: header, sidebar, toast, confirm |
+| `src/app/Views/errors/` | Error pages của framework |
+
+### Cách gọi view từ PageController
+
+Dùng **namespace path** — không dùng path tương đối kiểu `'admin/ten-module/index'`:
+
+```php
+// ✅ ĐÚNG — namespace path, CI4 tự resolve theo Composer PSR-4
+return view('Modules\TenModule\Views\feature/index');
+return view('Modules\TenModule\Views\feature/detail', ['data' => $data]);
+
+// ❌ SAI — path tương đối, view nằm ở app/Views (không đúng module)
+return view('admin/ten-module/index');
+```
+
+Namespace `Modules\TenModule` được đăng ký qua Composer PSR-4 (`"Modules\\": "modules/"`)
+và CI4 tự tìm file tại `src/modules/TenModule/Views/feature/index.php`.
+
+### Include partial của module khác
+
+Trong layout hoặc view, dùng namespace path tương tự:
+
+```php
+// Layout dùng AwesomeBar widget của module AwesomeBar
+<?= $this->include('Modules\AwesomeBar\Views\awesome_bar') ?>
+
+// View extend shared layout (layout nằm ở app/Views/layouts — không có namespace)
+<?= $this->extend('layouts/admin') ?>
+```
+
+### Cấu trúc Views trong module
+
+Không có quy định cứng về cây thư mục bên trong `Views/`, nhưng quy ước chung:
+
+```
+modules/Classroom/Views/
+├── classrooms/          — views cho teacher
+│   ├── index.php
+│   ├── detail.php
+│   └── assignment.php
+└── my_classrooms/       — views cho student
+    ├── index.php
+    └── detail.php
+```
+
+### PageController pattern
+
+Mỗi module có UI riêng tạo một `<Module>PageController` — controller này chỉ
+render view, không chứa business logic. Auth check được thực hiện ở client-side
+(Alpine.js kiểm tra JWT). Ví dụ:
+
+```php
+namespace Modules\Classroom\Controllers;
+
+use App\Controllers\BaseController;
+
+class ClassroomPageController extends BaseController
+{
+    public function index(): string
+    {
+        return view('Modules\Classroom\Views\classrooms/index');
+    }
+}
+```
 
 ---
 

@@ -12,14 +12,14 @@ $routes->get('/', 'Home::index');
 // ==========================================================================
 
 $routes->group('admin', ['namespace' => ''], function ($routes) {
-    $routes->get('login', '\Modules\SystemAdmin\Controllers\AdminPageController::login');
-    $routes->get('/', '\Modules\SystemAdmin\Controllers\AdminPageController::dashboard');
-    $routes->get('modules', '\Modules\SystemAdmin\Controllers\AdminPageController::modules');
-    $routes->get('configs', '\Modules\SystemAdmin\Controllers\AdminPageController::configs');
-    $routes->get('users', '\Modules\SystemAdmin\Controllers\AdminPageController::users');
-    $routes->get('profile', '\Modules\SystemAdmin\Controllers\AdminPageController::profile');
-    $routes->get('subscriptions', '\Modules\SystemAdmin\Controllers\AdminPageController::subscriptions', ['filter' => 'module_redirect:vortex-engine']);
-    $routes->get('system-logs', '\Modules\SystemAdmin\Controllers\AdminPageController::systemLogs');
+    $routes->get('login',        '\Modules\Auth\Controllers\AuthPageController::login');
+    $routes->get('profile',      '\Modules\Auth\Controllers\AuthPageController::profile');
+    $routes->get('/',            '\Modules\SystemAdmin\Controllers\AdminPageController::dashboard');
+    $routes->get('modules',      '\Modules\SystemAdmin\Controllers\AdminPageController::modules');
+    $routes->get('configs',      '\Modules\SystemAdmin\Controllers\AdminPageController::configs');
+    $routes->get('users',        '\Modules\SystemAdmin\Controllers\AdminPageController::users');
+    $routes->get('subscriptions', '\Modules\VortexEngine\Controllers\VortexEnginePageController::subscriptions', ['filter' => 'module_redirect:vortex-engine']);
+    $routes->get('system-logs',  '\Modules\SystemLog\Controllers\SystemLogPageController::index');
 });
 
 // Classroom module — page routes

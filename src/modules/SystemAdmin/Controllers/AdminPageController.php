@@ -4,86 +4,26 @@ namespace Modules\SystemAdmin\Controllers;
 
 use App\Controllers\BaseController;
 
-/**
- * AdminPageController - Serve các trang HTML cho admin panel.
- *
- * Controller này CHỈ render view. Toàn bộ logic business
- * được xử lý qua API (fetch từ frontend Alpine.js).
- *
- * Auth check thực hiện ở client-side (JS kiểm tra token trong localStorage).
- * Nếu không có token → redirect /admin/login.
- */
 class AdminPageController extends BaseController
 {
-    /**
-     * GET /admin/login
-     * Trang đăng nhập admin.
-     */
-    public function login(): string
-    {
-        return view('admin/login');
-    }
-
-    /**
-     * GET /admin
-     * Trang dashboard (tổng quan).
-     */
     public function dashboard(): string
     {
-        return view('admin/dashboard');
+        return view('Modules\SystemAdmin\Views\dashboard');
     }
 
-    /**
-     * GET /admin/modules
-     * Trang quản lý module (bật/tắt).
-     */
     public function modules(): string
     {
-        return view('admin/modules/index');
+        return view('Modules\SystemAdmin\Views\modules/index');
     }
 
-    /**
-     * GET /admin/configs
-     * Trang cài đặt website (key-value config).
-     */
     public function configs(): string
     {
-        return view('admin/configs/index');
+        return view('Modules\SystemAdmin\Views\configs/index');
     }
 
-    /**
-     * GET /admin/users
-     * Trang quản lý người dùng.
-     */
     public function users(): string
     {
-        return view('admin/users/index');
+        return view('Modules\SystemAdmin\Views\users/index');
     }
 
-    /**
-     * GET /admin/profile
-     * Trang hồ sơ cá nhân.
-     */
-    public function profile(): string
-    {
-        return view('admin/profile');
-    }
-
-    /**
-     * GET /admin/subscriptions
-     * Trang quản lý gói học (VortexEngine).
-     */
-    public function subscriptions(): string
-    {
-        return view('admin/subscriptions/index');
-    }
-
-    /**
-     * GET /admin/system-logs
-     * Trang nhật ký hệ thống.
-     */
-    public function systemLogs(): string
-    {
-        return view('admin/system_logs/index');
-    }
 }
