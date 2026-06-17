@@ -7,7 +7,7 @@
 <?= $this->section('content') ?>
 
 <div x-data="userManager()" x-init="loadUsers()"
-     x-on:keydown.escape.window="showModal = false; showResetModal = false">
+     x-on:keydown.escape.window="showModal = false; showResetModal = false; showModulesModal = false">
     <!-- Header -->
     <div class="page-header">
         <div>
@@ -102,6 +102,7 @@
                                     <div style="display:flex;gap:4px;flex-wrap:nowrap">
                                         <button class="btn btn--ghost btn--sm" @click="openEditModal(u)" title="Chỉnh sửa">✏</button>
                                         <button class="btn btn--ghost btn--sm" @click="openResetPasswordModal(u)" title="Đặt lại mật khẩu">🔑</button>
+                                        <button class="btn btn--ghost btn--sm" @click="openModulesModal(u)" title="Phân quyền module">🔐</button>
                                         <button class="btn btn--ghost btn--sm" @click="toggleStatus(u)" :title="u.status === 'active' ? 'Khóa' : 'Mở khóa'">
                                             <span x-text="u.status === 'active' ? '🔒' : '🔓'"></span>
                                         </button>
@@ -216,6 +217,55 @@
             </div>
         </div>
     </div>
+    <!-- Module Permissions Modal -->
+    <div x-show="showModulesModal" x-cloak
+         class="confirm-overlay"
+         @click.self="showModulesModal = false">
+        <div class="card" style="width:100%;max-width:480px;max-height:90vh;overflow-y:auto">
+            <div class="card__header">
+                <h3>Phân quyền module</h3>
+                <button class="btn btn--ghost btn--sm" @click="showModulesModal = false">✕</button>
+            </div>
+            <div class="card__body">
+                <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">
+                    Người dùng: <strong x-text="modulesTarget?.full_name"></strong><br>
+                    Tích chọn module để cấp quyền truy cập riêng (ngoài quyền của role).
+                </p>
+
+                <div x-show="loadingModules" style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px">
+                    Đang tải danh sách module...
+                </div>
+
+                <div x-show="!loadingModules && modulesList.length === 0"
+                     style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px">
+                    Không có module nào.
+                </div>
+
+                <div x-show="!loadingModules && modulesList.length > 0"
+                     style="display:flex;flex-direction:column;gap:8px">
+                    <template x-for="m in modulesList" :key="m.slug">
+                        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--color-border);border-radius:6px;cursor:pointer;transition:border-color 0.15s"
+                               :style="m.granted ? 'border-color:var(--color-primary);background:var(--color-primary-light)' : ''">
+                            <input type="checkbox" x-model="m.granted" style="width:16px;height:16px;flex-shrink:0">
+                            <div style="flex:1">
+                                <div style="font-size:13px;font-weight:500" x-text="m.name"></div>
+                                <div style="font-size:11px;color:var(--color-text-muted)" x-text="m.slug"></div>
+                            </div>
+                            <span x-show="!m.enabled" class="badge badge--secondary" style="font-size:10px">Tắt</span>
+                        </label>
+                    </template>
+                </div>
+
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+                    <button class="btn btn--secondary btn--sm" @click="showModulesModal = false">Hủy</button>
+                    <button class="btn btn--primary btn--sm" :disabled="savingModules" @click="saveModules()">
+                        <span x-text="savingModules ? 'Đang lưu...' : 'Lưu phân quyền'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Reset Password Modal -->
     <div x-show="showResetModal" x-cloak
          class="confirm-overlay"
@@ -271,6 +321,11 @@ function userManager() {
         showResetModal: false,
         resetTarget: null,
         resetForm: { new_password: '' },
+        showModulesModal: false,
+        modulesTarget: null,
+        modulesList: [],
+        loadingModules: false,
+        savingModules: false,
 
         roleLabel(role) {
             const map = { super_admin: 'Super Admin', workspace_admin: 'Giáo viên', user: 'Người dùng' };
@@ -373,6 +428,39 @@ function userManager() {
             }
 
             this.saving = false;
+        },
+
+        async openModulesModal(user) {
+            this.modulesTarget = user;
+            this.modulesList   = [];
+            this.showModulesModal = true;
+            this.loadingModules   = true;
+            const data = await apiGet('/api/admin/users/' + user.uuid + '/modules');
+            if (data?.status === 'success') this.modulesList = data.data;
+            this.loadingModules = false;
+        },
+
+        async saveModules() {
+            this.savingModules = true;
+            const token   = getToken();
+            const modules = this.modulesList.filter(m => m.granted).map(m => m.slug);
+            try {
+                const res  = await fetch('/api/admin/users/' + this.modulesTarget.uuid + '/modules', {
+                    method:  'PUT',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ modules }),
+                });
+                const data = await res.json();
+                if (data?.status === 'success') {
+                    showToast('success', 'Đã cập nhật phân quyền module.');
+                    this.showModulesModal = false;
+                } else {
+                    showToast('error', data?.message || 'Có lỗi xảy ra.');
+                }
+            } catch (e) {
+                showToast('error', 'Lỗi kết nối.');
+            }
+            this.savingModules = false;
         },
 
         openResetPasswordModal(user) {

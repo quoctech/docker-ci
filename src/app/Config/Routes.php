@@ -22,6 +22,15 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('system-logs', '\Modules\SystemAdmin\Controllers\AdminPageController::systemLogs');
 });
 
+// Classroom module — page routes
+$routes->group('admin', ['namespace' => ''], function ($routes) {
+    $routes->get('classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::index');
+    $routes->get('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::detail/$1');
+    $routes->get('classrooms/(:segment)/assignments/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::assignment/$1/$2');
+    $routes->get('my-classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::myClassrooms');
+    $routes->get('my-classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::myClassroomDetail/$1');
+});
+
 // Serve uploaded files (avatar)
 $routes->get('uploads/avatars/(:any)', 'UploadController::avatar/$1');
 
@@ -97,6 +106,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // User Management
         $routes->get('users', '\Modules\SystemAdmin\Controllers\UserManagementController::index');
+
         $routes->get('users/(:segment)', '\Modules\SystemAdmin\Controllers\UserManagementController::show/$1');
         $routes->post('users', '\Modules\SystemAdmin\Controllers\UserManagementController::create');
         $routes->put('users/(:segment)', '\Modules\SystemAdmin\Controllers\UserManagementController::update/$1');
@@ -105,5 +115,50 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->put('users/(:segment)/reset-password', '\Modules\SystemAdmin\Controllers\UserManagementController::resetPassword/$1');
         $routes->post('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::uploadAvatar/$1');
         $routes->delete('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::deleteAvatar/$1');
+
+        // User Module Permissions
+        $routes->get('users/(:segment)/modules', '\Modules\SystemAdmin\Controllers\UserModulePermissionController::getUserModules/$1');
+        $routes->put('users/(:segment)/modules', '\Modules\SystemAdmin\Controllers\UserModulePermissionController::setUserModules/$1');
+    });
+
+    // ------------------------------------------------------------------
+    // Classroom Module (Authenticated — controllers enforce role/ownership)
+    // ------------------------------------------------------------------
+    $routes->group('', ['filter' => 'auth'], function ($routes) {
+
+        // Teacher: classroom CRUD
+        $routes->get('classrooms', '\Modules\Classroom\Controllers\ClassroomController::index');
+        $routes->post('classrooms', '\Modules\Classroom\Controllers\ClassroomController::create');
+        $routes->post('classrooms/join', '\Modules\Classroom\Controllers\ClassroomMemberController::join');
+        $routes->get('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomController::show/$1');
+        $routes->put('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomController::update/$1');
+        $routes->delete('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomController::delete/$1');
+        $routes->put('classrooms/(:segment)/toggle-approval', '\Modules\Classroom\Controllers\ClassroomController::toggleApproval/$1');
+
+        // Teacher: members management
+        $routes->get('classrooms/(:segment)/members', '\Modules\Classroom\Controllers\ClassroomMemberController::index/$1');
+        $routes->put('classrooms/(:segment)/members/(:num)/approve', '\Modules\Classroom\Controllers\ClassroomMemberController::approve/$1/$2');
+        $routes->put('classrooms/(:segment)/members/(:num)/reject', '\Modules\Classroom\Controllers\ClassroomMemberController::reject/$1/$2');
+        $routes->delete('classrooms/(:segment)/members/(:num)', '\Modules\Classroom\Controllers\ClassroomMemberController::remove/$1/$2');
+
+        // Assignments (teacher creates/manages, student reads)
+        $routes->get('classrooms/(:segment)/assignments', '\Modules\Classroom\Controllers\AssignmentController::index/$1');
+        $routes->post('classrooms/(:segment)/assignments', '\Modules\Classroom\Controllers\AssignmentController::create/$1');
+        $routes->get('assignments/(:segment)', '\Modules\Classroom\Controllers\AssignmentController::show/$1');
+        $routes->put('assignments/(:segment)', '\Modules\Classroom\Controllers\AssignmentController::update/$1');
+        $routes->delete('assignments/(:segment)', '\Modules\Classroom\Controllers\AssignmentController::delete/$1');
+
+        // Submissions (student submits, teacher grades)
+        $routes->get('assignments/(:segment)/file', '\Modules\Classroom\Controllers\AssignmentController::downloadFile/$1');
+        $routes->post('assignments/(:segment)/submit', '\Modules\Classroom\Controllers\SubmissionController::submit/$1');
+        $routes->get('assignments/(:segment)/submissions', '\Modules\Classroom\Controllers\SubmissionController::index/$1');
+        $routes->get('assignments/(:segment)/my-submission', '\Modules\Classroom\Controllers\SubmissionController::mySubmission/$1');
+        $routes->put('submissions/(:segment)/grade', '\Modules\Classroom\Controllers\SubmissionController::grade/$1');
+
+        // Student: my classrooms
+        $routes->get('my-classrooms', '\Modules\Classroom\Controllers\ClassroomMemberController::myClassrooms');
+        $routes->get('my-classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomMemberController::show/$1');
+        $routes->get('my-classrooms/(:segment)/assignments', '\Modules\Classroom\Controllers\AssignmentController::index/$1');
+        $routes->delete('my-classrooms/(:segment)/leave', '\Modules\Classroom\Controllers\ClassroomMemberController::leave/$1');
     });
 });

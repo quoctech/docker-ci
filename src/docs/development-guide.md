@@ -154,4 +154,8 @@ use Modules\AwesomeBar\Repositories\AwesomeBarItemRepository;
 | `student_subscriptions` | Đăng ký gói học                |
 | `system_logs`         | Nhật ký lỗi & sự kiện            |
 | `awesome_bar_items`   | Registry tính năng CTRL+K        |
+| `classrooms`          | Lớp học (Classroom module)       |
+| `classroom_members`   | Thành viên lớp học               |
+| `assignments`         | Bài tập trong lớp học            |
+| `assignment_submissions` | Bài nộp của học sinh          |
 | `migrations`          | Lịch sử migration                |
