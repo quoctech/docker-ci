@@ -301,6 +301,44 @@ function assignmentGrader(classroomUuid, assignmentUuid) {
 }
 
 // ==========================================================================
+// Classroom — Teacher: all students across classrooms
+// ==========================================================================
+
+function classroomStudents() {
+    return {
+        students: [],
+        loading: false,
+        search: '',
+        filterClassroom: '',
+
+        get classrooms() {
+            const seen = new Set();
+            return this.students
+                .filter(s => { const ok = !seen.has(s.classroom_uuid); seen.add(s.classroom_uuid); return ok; })
+                .map(s => ({ uuid: s.classroom_uuid, name: s.classroom_name }));
+        },
+
+        get filtered() {
+            const q = this.search.toLowerCase().trim();
+            return this.students.filter(s => {
+                if (this.filterClassroom && s.classroom_uuid !== this.filterClassroom) return false;
+                if (!q) return true;
+                return s.full_name.toLowerCase().includes(q)
+                    || s.email.toLowerCase().includes(q)
+                    || (s.username || '').toLowerCase().includes(q);
+            });
+        },
+
+        async load() {
+            this.loading = true;
+            const data = await apiGet('/api/classrooms/students');
+            if (data?.status === 'success') this.students = data.data || [];
+            this.loading = false;
+        },
+    };
+}
+
+// ==========================================================================
 // Classroom — Student: my classrooms list
 // ==========================================================================
 

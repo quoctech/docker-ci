@@ -57,16 +57,19 @@ class ClassroomMemberRepository
 
     public function listByClassroom(int $classroomId, ?string $status = null): array
     {
-        $db = \Config\Database::connect();
-        $statusSql = $status ? "AND cm.status = " . $db->escape($status) : "";
+        $db      = \Config\Database::connect();
+        $builder = $db->table('classroom_members cm')
+            ->select('cm.*, u.full_name, u.email, u.username, u.grade AS student_grade', false)
+            ->join('users u', 'u.uuid = cm.student_uuid', 'inner', false)
+            ->where('cm.classroom_id', $classroomId)
+            ->orderBy('cm.status', 'ASC')
+            ->orderBy('cm.created_at', 'DESC');
 
-        return $db->query("
-            SELECT cm.*, u.full_name, u.email, u.username, u.grade AS student_grade
-            FROM classroom_members cm
-            JOIN users u ON u.uuid = cm.student_uuid
-            WHERE cm.classroom_id = ? {$statusSql}
-            ORDER BY cm.status ASC, cm.created_at DESC
-        ", [$classroomId])->getResultObject();
+        if ($status !== null) {
+            $builder->where('cm.status', $status);
+        }
+
+        return $builder->get()->getResultObject();
     }
 
     public function isEnrolled(int $classroomId, string $studentUuid): ?object
@@ -77,20 +80,45 @@ class ClassroomMemberRepository
             ->first();
     }
 
+    public function allStudentsByTeacher(?string $teacherUuid): array
+    {
+        $db = \Config\Database::connect();
+
+        $builder = $db->table('classroom_members cm')
+            ->select('u.full_name, u.email, u.username', false)
+            ->select('c.uuid AS classroom_uuid, c.name AS classroom_name, c.subject, c.grade', false)
+            ->select('cm.id AS member_id, cm.status, cm.joined_at', false)
+            ->select('(SELECT COUNT(*) FROM assignment_submissions s JOIN assignments a ON a.id = s.assignment_id WHERE s.student_uuid = u.uuid AND a.classroom_id = c.id) AS submission_count', false)
+            ->join('classrooms c', 'c.id = cm.classroom_id', 'inner', false)
+            ->join('users u', 'u.uuid = cm.student_uuid', 'inner', false)
+            ->where('c.is_active', 1)
+            ->where('cm.status', 'approved')
+            ->orderBy('c.name', 'ASC')
+            ->orderBy('u.full_name', 'ASC');
+
+        if ($teacherUuid !== null) {
+            $builder->where('c.teacher_uuid', $teacherUuid);
+        }
+
+        return $builder->get()->getResultObject();
+    }
+
     public function myClassrooms(string $studentUuid): array
     {
         $db = \Config\Database::connect();
-        return $db->query("
-            SELECT c.id AS classroom_id, c.uuid AS classroom_uuid,
-                   c.name AS classroom_name, c.subject, c.grade,
-                   cm.id AS member_id, cm.status, cm.joined_at,
-                   u.full_name AS teacher_name,
-                   (SELECT COUNT(*) FROM assignments a WHERE a.classroom_id = c.id AND a.is_published = 1) AS assignment_count
-            FROM classroom_members cm
-            JOIN classrooms c ON c.id = cm.classroom_id AND c.is_active = 1
-            JOIN users u ON u.uuid = c.teacher_uuid
-            WHERE cm.student_uuid = ? AND cm.status != 'rejected'
-            ORDER BY cm.joined_at DESC, cm.created_at DESC
-        ", [$studentUuid])->getResultObject();
+        return $db->table('classroom_members cm')
+            ->select('c.id AS classroom_id, c.uuid AS classroom_uuid, c.name AS classroom_name, c.subject, c.grade', false)
+            ->select('cm.id AS member_id, cm.status, cm.joined_at', false)
+            ->select('u.full_name AS teacher_name', false)
+            ->select('(SELECT COUNT(*) FROM assignments a WHERE a.classroom_id = c.id AND a.is_published = 1) AS assignment_count', false)
+            ->join('classrooms c', 'c.id = cm.classroom_id', 'inner', false)
+            ->join('users u', 'u.uuid = c.teacher_uuid', 'inner', false)
+            ->where('c.is_active', 1)
+            ->where('cm.student_uuid', $studentUuid)
+            ->where('cm.status !=', 'rejected')
+            ->orderBy('cm.joined_at', 'DESC')
+            ->orderBy('cm.created_at', 'DESC')
+            ->get()
+            ->getResultObject();
     }
 }

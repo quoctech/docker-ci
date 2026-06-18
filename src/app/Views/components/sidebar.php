@@ -17,8 +17,8 @@ $currentUri = uri_string();
     <!-- Nav chính (cuộn được) -->
     <ul class="sidebar__nav">
 
-        <!-- Bảng điều khiển — tất cả role nhưng student bị redirect từ trang dashboard -->
-        <li class="sidebar__nav-group" x-show="user && user.role !== 'user'" x-cloak>
+        <!-- Bảng điều khiển — chỉ super_admin -->
+        <li class="sidebar__nav-group" x-show="user && user.role === 'super_admin'" x-cloak>
             <div class="sidebar__nav-label">Tổng quan</div>
             <ul>
                 <li class="sidebar__nav-item <?= $currentUri === 'admin' ? 'sidebar__nav-item--active' : '' ?>">
@@ -43,9 +43,23 @@ $currentUri = uri_string();
             </ul>
         </li>
 
-        <!-- Tính năng (modules) — super_admin + workspace_admin (giáo viên) -->
+        <!-- Lớp học — giáo viên và super_admin -->
+        <li class="sidebar__nav-group" x-show="user && (user.role === 'workspace_admin' || user.role === 'super_admin')" x-cloak>
+            <div class="sidebar__nav-label">Lớp học</div>
+            <ul>
+                <li class="sidebar__nav-item <?= $currentUri === 'admin/classrooms' ? 'sidebar__nav-item--active' : '' ?>"
+                    x-show="user && user.role === 'workspace_admin'" x-cloak>
+                    <a href="/admin/classrooms">🏫 Quản lý lớp học</a>
+                </li>
+                <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/classrooms/students') ? 'sidebar__nav-item--active' : '' ?>">
+                    <a href="/admin/classrooms/students">👥 Danh sách học sinh</a>
+                </li>
+            </ul>
+        </li>
+
+        <!-- Tính năng (modules) — chỉ super_admin -->
         <?php if (! empty($sidebarModules)): ?>
-        <li class="sidebar__nav-group" x-show="user && user.role !== 'user'" x-cloak>
+        <li class="sidebar__nav-group" x-show="user && user.role === 'super_admin'" x-cloak>
             <div class="sidebar__nav-label">Tính năng</div>
             <ul>
                 <?php foreach ($sidebarModules as $mod): ?>

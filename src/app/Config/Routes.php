@@ -25,6 +25,7 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
 // Classroom module — page routes
 $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::index');
+    $routes->get('classrooms/students', '\Modules\Classroom\Controllers\ClassroomPageController::students');
     $routes->get('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::detail/$1');
     $routes->get('classrooms/(:segment)/assignments/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::assignment/$1/$2');
     $routes->get('my-classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::myClassrooms');
@@ -128,6 +129,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
 
         // Teacher: classroom CRUD
         $routes->get('classrooms', '\Modules\Classroom\Controllers\ClassroomController::index');
+        $routes->get('classrooms/students', '\Modules\Classroom\Controllers\ClassroomMemberController::allStudents');
         $routes->post('classrooms', '\Modules\Classroom\Controllers\ClassroomController::create');
         $routes->post('classrooms/join', '\Modules\Classroom\Controllers\ClassroomMemberController::join');
         $routes->get('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomController::show/$1');

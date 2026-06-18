@@ -9,11 +9,20 @@ function checkAlreadyLoggedIn() {
     window.location.replace(safeRedirect(redirect));
 }
 
-function safeRedirect(url) {
+function defaultHome(role) {
+    if (role === 'workspace_admin') return '/admin/classrooms';
+    if (role === 'user')           return '/admin/my-classrooms';
+    return '/admin';
+}
+
+function safeRedirect(url, role) {
     if (url && url.startsWith('/admin') && !url.startsWith('/admin/login')) {
         return url;
     }
-    return '/admin';
+    if (!role) {
+        try { role = JSON.parse(localStorage.getItem('user') || 'null')?.role; } catch (e) {}
+    }
+    return defaultHome(role);
 }
 
 function loginForm() {
@@ -43,7 +52,7 @@ function loginForm() {
                     localStorage.setItem('user', JSON.stringify(data.data.user));
 
                     const redirect = new URLSearchParams(window.location.search).get('redirect');
-                    window.location.href = safeRedirect(redirect);
+                    window.location.href = safeRedirect(redirect, data.data.user?.role);
                 } else {
                     if (data.errors) {
                         this.errors = data.errors;

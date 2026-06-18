@@ -109,6 +109,20 @@ class ClassroomMemberController extends ApiController
         return $this->success(null, 'Đã xóa học sinh khỏi lớp.');
     }
 
+    /** GET /api/classrooms/students — giáo viên xem tất cả học sinh các lớp */
+    public function allStudents(): ResponseInterface
+    {
+        $auth = $this->getAuthUser();
+        if ($auth->role !== 'workspace_admin' && $auth->role !== 'super_admin') {
+            return $this->error('Không có quyền truy cập.', 403);
+        }
+
+        // super_admin xem tất cả, giáo viên chỉ xem lớp của mình
+        $teacherUuid = $auth->role === 'super_admin' ? null : $auth->sub;
+        $students = $this->memberRepo->allStudentsByTeacher($teacherUuid);
+        return $this->success($students);
+    }
+
     /** GET /api/my-classrooms — học sinh xem lớp đã tham gia */
     public function myClassrooms(): ResponseInterface
     {

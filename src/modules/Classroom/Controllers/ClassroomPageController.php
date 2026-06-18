@@ -24,6 +24,11 @@ class ClassroomPageController extends BaseController
         ]);
     }
 
+    public function students(): string
+    {
+        return view('Modules\Classroom\Views\classrooms/students');
+    }
+
     public function myClassrooms(): string
     {
         return view('Modules\Classroom\Views\my_classrooms/index');
