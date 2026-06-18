@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - BladeEngine Admin</title>
     <link rel="stylesheet" href="/assets/css/admin.css">
+    <script src="/assets/modules/Auth/auth.js"></script>
     <script defer src="/assets/js/alpine.min.js"></script>
 </head>
 <body>
@@ -59,66 +60,7 @@
     </div>
 </div>
 
-<script>
-function checkAlreadyLoggedIn() {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
-    const redirect = new URLSearchParams(window.location.search).get('redirect');
-    window.location.replace(safeRedirect(redirect));
-}
-
-function safeRedirect(url) {
-    // Chỉ cho phép redirect nội bộ /admin/*
-    if (url && url.startsWith('/admin') && !url.startsWith('/admin/login')) {
-        return url;
-    }
-    return '/admin';
-}
-
-function loginForm() {
-    return {
-        form: { identifier: '', password: '' },
-        errors: {},
-        errorMessage: '',
-        loading: false,
-
-        async submit() {
-            this.errors = {};
-            this.errorMessage = '';
-            this.loading = true;
-
-            try {
-                const body = new URLSearchParams(this.form);
-                const res = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: body
-                });
-
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    localStorage.setItem('access_token', data.data.access_token);
-                    localStorage.setItem('user', JSON.stringify(data.data.user));
-
-                    const redirect = new URLSearchParams(window.location.search).get('redirect');
-                    window.location.href = safeRedirect(redirect);
-                } else {
-                    if (data.errors) {
-                        this.errors = data.errors;
-                    } else {
-                        this.errorMessage = data.message;
-                    }
-                }
-            } catch (e) {
-                this.errorMessage = 'Lỗi kết nối. Vui lòng thử lại.';
-            } finally {
-                this.loading = false;
-            }
-        }
-    };
-}
-</script>
+<!-- Auth functions loaded from /assets/modules/Auth/auth.js -->
 
 </body>
 </html>

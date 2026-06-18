@@ -154,6 +154,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->get('assignments/(:segment)/submissions', '\Modules\Classroom\Controllers\SubmissionController::index/$1');
         $routes->get('assignments/(:segment)/my-submission', '\Modules\Classroom\Controllers\SubmissionController::mySubmission/$1');
         $routes->put('submissions/(:segment)/grade', '\Modules\Classroom\Controllers\SubmissionController::grade/$1');
+        $routes->get('submissions/(:segment)/images/(:num)', '\Modules\Classroom\Controllers\SubmissionController::image/$1/$2');
 
         // Student: my classrooms
         $routes->get('my-classrooms', '\Modules\Classroom\Controllers\ClassroomMemberController::myClassrooms');

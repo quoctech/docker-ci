@@ -29,6 +29,9 @@ class ClassroomMemberController extends ApiController
         if (! $code) return $this->error('Vui lòng nhập mã lớp học.', 422);
 
         $auth = $this->getAuthUser();
+        if ($auth->role !== 'user') {
+            return $this->error('Chỉ học sinh mới có thể tham gia lớp bằng mã.', 403);
+        }
 
         $classroom = $this->classroomRepo->findByCode($code);
         if (! $classroom) return $this->error('Mã lớp học không tồn tại hoặc đã đóng.', 404);

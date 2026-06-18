@@ -6,6 +6,15 @@
 
 <?= $this->section('content') ?>
 
+<script>
+(function() {
+    try {
+        var u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u && u.role === 'user') window.location.replace('/admin/my-classrooms');
+    } catch (e) {}
+})();
+</script>
+
 <div x-data="classroomManager()" x-init="load()">
 
     <div class="page-header">
@@ -128,80 +137,12 @@
 
 </div>
 
-<style>
-.classroom-card { transition: box-shadow var(--transition); }
-.classroom-card:hover { box-shadow: var(--shadow-md); }
-</style>
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="/assets/modules/Classroom/classroom.css">
+<?= $this->endSection() ?>
 
-<script>
-function classroomManager() {
-    return {
-        classrooms: [],
-        loading: false,
-        showCreate: false,
-        submitting: false,
-        form: { name: '', subject: '', grade: '', description: '', auto_approve: true },
-
-        async load() {
-            this.loading = true;
-            const data = await apiGet('/api/classrooms');
-            if (data?.status === 'success') this.classrooms = data.data;
-            this.loading = false;
-        },
-
-        openCreate() {
-            this.form = { name: '', subject: '', grade: '', description: '', auto_approve: true };
-            this.showCreate = true;
-        },
-
-        async submitCreate() {
-            if (!this.form.name.trim()) { showToast('error', 'Vui lòng nhập tên lớp học.'); return; }
-            this.submitting = true;
-            const body = new URLSearchParams({
-                name:         this.form.name,
-                subject:      this.form.subject || '',
-                grade:        this.form.grade || '',
-                description:  this.form.description || '',
-                auto_approve: this.form.auto_approve ? '1' : '0',
-            });
-            const data = await apiRequest('/api/classrooms', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            this.submitting = false;
-            if (data?.status === 'success') {
-                showToast('success', 'Tạo lớp học thành công!');
-                this.showCreate = false;
-                await this.load();
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        viewDetail(c) {
-            window.location.href = '/admin/classrooms/' + c.uuid;
-        },
-
-        async copyCode(code) {
-            await navigator.clipboard.writeText(code);
-            showToast('success', 'Đã copy mã lớp: ' + code);
-        },
-
-        async confirmDelete(c) {
-            const ok = await showConfirm({
-                title: 'Xóa lớp học',
-                message: 'Xóa lớp "' + c.name + '"? Toàn bộ bài tập và dữ liệu sẽ bị xóa.',
-                type: 'danger',
-                confirmText: 'Xóa'
-            });
-            if (!ok) return;
-            const data = await apiRequest('/api/classrooms/' + c.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                showToast('success', 'Đã xóa lớp học.');
-                this.classrooms = this.classrooms.filter(x => x.uuid !== c.uuid);
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-    };
-}
-</script>
+<?= $this->section('scripts') ?>
+<script src="/assets/modules/Classroom/classroom.js"></script>
+<?= $this->endSection() ?>
 
 <?= $this->endSection() ?>

@@ -38,7 +38,12 @@ class AssignmentController extends ApiController
             }
         }
 
-        $assignments = $this->assignmentRepo->listByClassroom($classroom->id, ! $isTeacher);
+        if ($isTeacher) {
+            $assignments = $this->assignmentRepo->listByClassroom($classroom->id, false);
+        } else {
+            $assignments = $this->assignmentRepo->listByClassroomForStudent($classroom->id, $auth->sub);
+        }
+
         return $this->success($assignments);
     }
 

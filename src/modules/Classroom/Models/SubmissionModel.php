@@ -11,7 +11,7 @@ class SubmissionModel extends Model
     protected $returnType    = 'object';
     protected $useTimestamps = false;
     protected $allowedFields = [
-        'uuid', 'assignment_id', 'student_uuid', 'content', 'file_url',
+        'uuid', 'assignment_id', 'student_uuid', 'content', 'file_url', 'image_paths',
         'score', 'feedback', 'status', 'submitted_at', 'graded_at', 'created_at',
     ];
 }

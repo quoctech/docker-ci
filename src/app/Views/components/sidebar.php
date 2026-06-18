@@ -16,7 +16,9 @@ $currentUri = uri_string();
 
     <!-- Nav chính (cuộn được) -->
     <ul class="sidebar__nav">
-        <li class="sidebar__nav-group">
+
+        <!-- Bảng điều khiển — tất cả role nhưng student bị redirect từ trang dashboard -->
+        <li class="sidebar__nav-group" x-show="user && user.role !== 'user'" x-cloak>
             <div class="sidebar__nav-label">Tổng quan</div>
             <ul>
                 <li class="sidebar__nav-item <?= $currentUri === 'admin' ? 'sidebar__nav-item--active' : '' ?>">
@@ -25,7 +27,8 @@ $currentUri = uri_string();
             </ul>
         </li>
 
-        <li class="sidebar__nav-group">
+        <!-- Hệ thống — chỉ super_admin -->
+        <li class="sidebar__nav-group" x-show="user && user.role === 'super_admin'" x-cloak>
             <div class="sidebar__nav-label">Hệ thống</div>
             <ul>
                 <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/users') ? 'sidebar__nav-item--active' : '' ?>">
@@ -40,8 +43,9 @@ $currentUri = uri_string();
             </ul>
         </li>
 
+        <!-- Tính năng (modules) — super_admin + workspace_admin (giáo viên) -->
         <?php if (! empty($sidebarModules)): ?>
-        <li class="sidebar__nav-group">
+        <li class="sidebar__nav-group" x-show="user && user.role !== 'user'" x-cloak>
             <div class="sidebar__nav-label">Tính năng</div>
             <ul>
                 <?php foreach ($sidebarModules as $mod): ?>
@@ -54,10 +58,21 @@ $currentUri = uri_string();
             </ul>
         </li>
         <?php endif; ?>
+
+        <!-- Học tập — chỉ user (học sinh) -->
+        <li class="sidebar__nav-group" x-show="user && user.role === 'user'" x-cloak>
+            <div class="sidebar__nav-label">Học tập</div>
+            <ul>
+                <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/my-classrooms') ? 'sidebar__nav-item--active' : '' ?>">
+                    <a href="/admin/my-classrooms">📚 Lớp học của tôi</a>
+                </li>
+            </ul>
+        </li>
+
     </ul>
 
-    <!-- Cài đặt Website — luôn ghim ở cuối sidebar -->
-    <div class="sidebar__footer">
+    <!-- Cài đặt Website — chỉ super_admin -->
+    <div class="sidebar__footer" x-show="user && user.role === 'super_admin'" x-cloak>
         <a href="/admin/configs"
            class="sidebar__nav-item-link <?= str_starts_with($currentUri, 'admin/configs') ? 'sidebar__nav-item-link--active' : '' ?>">
             ⚙ Cài đặt Website

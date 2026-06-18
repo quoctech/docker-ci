@@ -33,7 +33,7 @@ class SubmissionRepository
             }
             $this->model->update($existing->id, [
                 'content'      => $data['content'] ?? null,
-                'file_url'     => $data['file_url'] ?? null,
+                'image_paths'  => $data['image_paths'] ?? null,
                 'submitted_at' => $now,
             ]);
             return $this->model->find($existing->id);
@@ -44,7 +44,7 @@ class SubmissionRepository
             'assignment_id' => $assignmentId,
             'student_uuid'  => $studentUuid,
             'content'       => $data['content'] ?? null,
-            'file_url'      => $data['file_url'] ?? null,
+            'image_paths'   => $data['image_paths'] ?? null,
             'status'        => 'submitted',
             'submitted_at'  => $now,
             'created_at'    => $now,

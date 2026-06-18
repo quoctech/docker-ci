@@ -22,7 +22,7 @@
         </div>
         <div style="display:flex;gap:8px">
             <button class="btn btn--ghost btn--sm" @click="toggleApproval()"
-                    x-text="classroom?.auto_approve ? '🔒 Chuyển sang duyệt thủ công' : '✅ Bật tự động duyệt'"></button>
+                    x-text="classroom?.auto_approve ? 'Chuyển sang duyệt thủ công' : 'Bật tự động duyệt'"></button>
             <button class="btn btn--primary btn--sm" @click="openCreateAssignment()">+ Đăng bài tập</button>
         </div>
     </div>
@@ -231,157 +231,12 @@
 
 </div>
 
-<style>
-.tab-btn {
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 500;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    color: var(--color-text-muted);
-    transition: color var(--transition), border-color var(--transition);
-}
-.tab-btn:hover { color: var(--color-text); }
-.tab-btn--active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
-.btn--success { background: var(--color-success); color: #fff; border: none; }
-.btn--success:hover { filter: brightness(0.92); }
-</style>
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="/assets/modules/Classroom/classroom.css">
+<?= $this->endSection() ?>
 
-<script>
-function classroomDetail(uuid) {
-    return {
-        uuid,
-        classroom: null,
-        members: [],
-        assignments: [],
-        tab: 'members',
-        loading: false,
-        loadingAssignments: false,
-        showAssignmentForm: false,
-        submittingA: false,
-        aForm: { title: '', description: '', due_date: '', max_score: 100, is_published: true, file: null },
-
-        get pendingMembers()  { return this.members.filter(m => m.status === 'pending'); },
-        get approvedMembers() { return this.members.filter(m => m.status === 'approved'); },
-        get pendingCount()    { return this.pendingMembers.length; },
-
-        async load() {
-            this.loading = true;
-            const [classData, memberData, assignData] = await Promise.all([
-                apiGet('/api/classrooms/' + this.uuid),
-                apiGet('/api/classrooms/' + this.uuid + '/members'),
-                apiGet('/api/classrooms/' + this.uuid + '/assignments'),
-            ]);
-            if (classData?.status === 'success')  this.classroom    = classData.data;
-            if (memberData?.status === 'success') this.members      = memberData.data;
-            if (assignData?.status === 'success') this.assignments  = assignData.data;
-            this.loading = false;
-        },
-
-        async copyCode() {
-            await navigator.clipboard.writeText(this.classroom.code);
-            showToast('success', 'Đã copy mã lớp: ' + this.classroom.code);
-        },
-
-        async toggleApproval() {
-            const data = await apiRequest('/api/classrooms/' + this.uuid + '/toggle-approval', { method: 'PUT' });
-            if (data?.status === 'success') {
-                this.classroom.auto_approve = data.data.auto_approve ? 1 : 0;
-                showToast('success', data.message);
-            }
-        },
-
-        async approve(m) {
-            const data = await apiRequest('/api/classrooms/' + this.uuid + '/members/' + m.id + '/approve', { method: 'PUT' });
-            if (data?.status === 'success') {
-                m.status = 'approved'; m.joined_at = new Date().toISOString();
-                showToast('success', 'Đã duyệt học sinh.');
-            }
-        },
-
-        async reject(m) {
-            const ok = await showConfirm({ title: 'Từ chối', message: 'Từ chối "' + m.full_name + '"?', type: 'warning', confirmText: 'Từ chối' });
-            if (!ok) return;
-            const data = await apiRequest('/api/classrooms/' + this.uuid + '/members/' + m.id + '/reject', { method: 'PUT' });
-            if (data?.status === 'success') {
-                this.members = this.members.filter(x => x.id !== m.id);
-                showToast('success', 'Đã từ chối.');
-            }
-        },
-
-        async removeMember(m) {
-            const ok = await showConfirm({ title: 'Xóa học sinh', message: 'Xóa "' + m.full_name + '" khỏi lớp?', type: 'danger', confirmText: 'Xóa' });
-            if (!ok) return;
-            const data = await apiRequest('/api/classrooms/' + this.uuid + '/members/' + m.id, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                this.members = this.members.filter(x => x.id !== m.id);
-                showToast('success', 'Đã xóa khỏi lớp.');
-            }
-        },
-
-        openCreateAssignment() {
-            this.aForm = { title: '', description: '', due_date: '', max_score: 100, is_published: true, file: null };
-            this.showAssignmentForm = true;
-        },
-
-        async submitAssignment() {
-            if (!this.aForm.title.trim()) { showToast('error', 'Vui lòng nhập tiêu đề bài tập.'); return; }
-            this.submittingA = true;
-            const fd = new FormData();
-            fd.append('title',        this.aForm.title);
-            fd.append('description',  this.aForm.description || '');
-            fd.append('due_date',     this.aForm.due_date || '');
-            fd.append('max_score',    this.aForm.max_score || 100);
-            fd.append('is_published', this.aForm.is_published ? '1' : '0');
-            if (this.aForm.file) fd.append('assignment_file', this.aForm.file);
-            const data = await apiRequest('/api/classrooms/' + this.uuid + '/assignments', {
-                method: 'POST', body: fd
-            });
-            this.submittingA = false;
-            if (data?.status === 'success') {
-                showToast('success', 'Đã đăng bài tập!');
-                this.showAssignmentForm = false;
-                this.assignments.unshift(data.data);
-                this.tab = 'assignments';
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        async downloadFile(a) {
-            const token = getToken();
-            const res = await fetch('/api/assignments/' + a.uuid + '/file', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!res.ok) { showToast('error', 'Không thể tải file.'); return; }
-            const cd  = res.headers.get('Content-Disposition') || '';
-            const ext = a.file_path ? a.file_path.split('.').pop() : 'pdf';
-            const filename = cd.match(/filename="([^"]+)"/)?.[1] || (a.title + '.' + ext);
-            const blob = await res.blob();
-            const url  = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url; link.download = filename;
-            document.body.appendChild(link); link.click();
-            document.body.removeChild(link); URL.revokeObjectURL(url);
-        },
-
-        viewAssignment(a) {
-            window.location.href = '/admin/classrooms/' + this.uuid + '/assignments/' + a.uuid;
-        },
-
-        async deleteAssignment(a) {
-            const ok = await showConfirm({ title: 'Xóa bài tập', message: 'Xóa "' + a.title + '"?', type: 'danger', confirmText: 'Xóa' });
-            if (!ok) return;
-            const data = await apiRequest('/api/assignments/' + a.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                this.assignments = this.assignments.filter(x => x.uuid !== a.uuid);
-                showToast('success', 'Đã xóa bài tập.');
-            }
-        },
-    };
-}
-</script>
+<?= $this->section('scripts') ?>
+<script src="/assets/modules/Classroom/classroom.js"></script>
+<?= $this->endSection() ?>
 
 <?= $this->endSection() ?>

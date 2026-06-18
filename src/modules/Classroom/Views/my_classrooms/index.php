@@ -6,6 +6,15 @@
 
 <?= $this->section('content') ?>
 
+<script>
+(function() {
+    try {
+        var u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u && u.role !== 'user') window.location.replace('/admin/classrooms');
+    } catch (e) {}
+})();
+</script>
+
 <div x-data="myClassrooms()" x-init="load()">
 
     <div class="page-header">
@@ -115,71 +124,12 @@
 
 </div>
 
-<style>
-.classroom-card { transition: box-shadow var(--transition); }
-.classroom-card:hover { box-shadow: var(--shadow-md); }
-.alert-success { background: color-mix(in srgb, var(--color-success) 10%, transparent); color: var(--color-success); border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent); }
-.alert-error { background: color-mix(in srgb, var(--color-danger) 10%, transparent); color: var(--color-danger); border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent); }
-</style>
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="/assets/modules/Classroom/classroom.css">
+<?= $this->endSection() ?>
 
-<script>
-function myClassrooms() {
-    return {
-        classrooms: [],
-        pending: [],
-        loading: false,
-        showJoin: false,
-        joining: false,
-        joinCode: '',
-        joinMessage: '',
-        joinSuccess: false,
-
-        async load() {
-            this.loading = true;
-            const data = await apiGet('/api/my-classrooms');
-            if (data?.status === 'success') {
-                this.classrooms = (data.data || []).filter(c => c.status === 'approved');
-                this.pending    = (data.data || []).filter(c => c.status === 'pending');
-            }
-            this.loading = false;
-        },
-
-        viewDetail(c) {
-            window.location.href = '/admin/my-classrooms/' + c.classroom_uuid;
-        },
-
-        async submitJoin() {
-            if (!this.joinCode.trim()) return;
-            this.joining = true;
-            this.joinMessage = '';
-            const body = new URLSearchParams({ code: this.joinCode.trim() });
-            const data = await apiRequest('/api/classrooms/join', {
-                method: 'POST', body,
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
-            this.joining = false;
-            if (data?.status === 'success') {
-                this.joinSuccess = true;
-                this.joinMessage = data.message || 'Yêu cầu tham gia đã được gửi!';
-                this.joinCode = '';
-                await this.load();
-            } else {
-                this.joinSuccess = false;
-                this.joinMessage = data?.message || 'Có lỗi xảy ra.';
-            }
-        },
-
-        async cancelRequest(m) {
-            const ok = await showConfirm({ title: 'Hủy yêu cầu', message: 'Hủy yêu cầu tham gia lớp "' + m.classroom_name + '"?', type: 'warning', confirmText: 'Hủy yêu cầu' });
-            if (!ok) return;
-            const data = await apiRequest('/api/my-classrooms/' + m.classroom_uuid + '/leave', { method: 'DELETE' });
-            if (data?.status === 'success') {
-                this.pending = this.pending.filter(x => x.classroom_id !== m.classroom_id);
-                showToast('success', 'Đã hủy yêu cầu tham gia.');
-            }
-        },
-    };
-}
-</script>
+<?= $this->section('scripts') ?>
+<script src="/assets/modules/Classroom/classroom.js"></script>
+<?= $this->endSection() ?>
 
 <?= $this->endSection() ?>

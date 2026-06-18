@@ -51,6 +51,53 @@ class AssignmentRepository
         ", [$classroomId])->getResultObject();
     }
 
+    public function listByClassroomForStudent(int $classroomId, string $studentUuid): array
+    {
+        $db   = \Config\Database::connect();
+        $rows = $db->query("
+            SELECT a.*,
+                   s.id          AS sub_id,
+                   s.uuid        AS sub_uuid,
+                   s.content     AS sub_content,
+                   s.image_paths AS sub_image_paths,
+                   s.status      AS sub_status,
+                   s.score       AS sub_score,
+                   s.feedback    AS sub_feedback,
+                   s.submitted_at AS sub_submitted_at,
+                   s.graded_at   AS sub_graded_at
+            FROM assignments a
+            LEFT JOIN assignment_submissions s
+                   ON s.assignment_id = a.id AND s.student_uuid = ?
+            WHERE a.classroom_id = ? AND a.is_published = 1
+            ORDER BY a.created_at DESC
+        ", [$studentUuid, $classroomId])->getResultObject();
+
+        foreach ($rows as $row) {
+            if ($row->sub_id !== null) {
+                $row->my_submission = (object) [
+                    'id'           => $row->sub_id,
+                    'uuid'         => $row->sub_uuid,
+                    'content'      => $row->sub_content,
+                    'image_paths'  => $row->sub_image_paths
+                                        ? json_decode($row->sub_image_paths, true)
+                                        : [],
+                    'status'       => $row->sub_status,
+                    'score'        => $row->sub_score,
+                    'feedback'     => $row->sub_feedback,
+                    'submitted_at' => $row->sub_submitted_at,
+                    'graded_at'    => $row->sub_graded_at,
+                ];
+            } else {
+                $row->my_submission = null;
+            }
+            unset($row->sub_id, $row->sub_uuid, $row->sub_content, $row->sub_image_paths,
+                  $row->sub_status, $row->sub_score, $row->sub_feedback,
+                  $row->sub_submitted_at, $row->sub_graded_at);
+        }
+
+        return $rows;
+    }
+
     public function findByUuid(string $uuid): ?object
     {
         return $this->model->where('uuid', $uuid)->first();

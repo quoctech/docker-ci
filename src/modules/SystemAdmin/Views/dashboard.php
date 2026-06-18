@@ -6,6 +6,15 @@
 
 <?= $this->section('content') ?>
 
+<script>
+(function() {
+    try {
+        var u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u && u.role === 'user') window.location.replace('/admin/my-classrooms');
+    } catch (e) {}
+})();
+</script>
+
 <div x-data="dashboardStats()" x-init="load()">
 
     <!-- Page header with version info -->
@@ -165,146 +174,12 @@
 
 </div>
 
-<style>
-/* Stat strip */
-.dashboard-stats {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    flex-wrap: wrap;
-}
-.dashboard-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 32px 4px 0;
-}
-.dashboard-stat__num {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--color-text);
-    line-height: 1;
-}
-.dashboard-stat__label {
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-.dashboard-stat__divider {
-    width: 1px;
-    height: 32px;
-    background: var(--color-border);
-    margin-right: 32px;
-    flex-shrink: 0;
-}
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="/assets/modules/SystemAdmin/system-admin.css">
+<?= $this->endSection() ?>
 
-/* Status Report table */
-.sr-table {
-    font-size: 13px;
-}
-.sr-table td {
-    vertical-align: middle;
-    padding: 10px 16px;
-}
-.sr-table .sr-status {
-    width: 36px;
-    text-align: center;
-    font-size: 14px;
-    font-weight: 700;
-    padding-left: 20px;
-}
-.sr-ok     { color: var(--color-success); }
-.sr-err    { color: var(--color-danger); }
-.sr-warn   { color: var(--color-warning); }
-.sr-neutral { color: var(--color-text-muted); }
-
-.sr-label {
-    width: 130px;
-    font-weight: 500;
-    color: var(--color-text);
-    white-space: nowrap;
-}
-.sr-value {
-    color: var(--color-text);
-}
-.sr-meta {
-    color: var(--color-text-muted);
-    font-size: 12px;
-    margin-left: 6px;
-}
-.sr-note {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    margin-left: 8px;
-}
-
-/* Progress bar in table */
-.sr-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.sr-bar {
-    width: 140px;
-    height: 5px;
-    background: var(--color-border);
-    border-radius: 2px;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-.sr-bar__fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width .3s;
-}
-
-@media (max-width: 639px) {
-    .dashboard-stat { padding: 4px 20px 4px 0; }
-    .dashboard-stat__divider { margin-right: 20px; }
-    .sr-label { width: 100px; }
-    .sr-bar { width: 80px; }
-}
-</style>
-
-<script>
-function dashboardStats() {
-    return {
-        stats: { total_users: '—', active_modules: '—', unseen_logs: '—' },
-        serverStatus: null,
-        loadingStatus: false,
-
-        async load() {
-            await Promise.all([this.loadStats(), this.loadStatus()]);
-        },
-
-        async loadStats() {
-            const token = localStorage.getItem('access_token');
-            try {
-                const [modData, usrData, logData] = await Promise.all([
-                    fetch('/api/admin/modules',           { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()),
-                    fetch('/api/admin/users?per_page=1',  { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()),
-                    fetch('/api/admin/system-logs/stats', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()),
-                ]);
-                if (modData.status === 'success')
-                    this.stats.active_modules = modData.data.filter(m => m.is_enabled).length + '/' + modData.data.length;
-                if (usrData.status === 'success')
-                    this.stats.total_users = usrData.data.pagination.total;
-                if (logData.status === 'success')
-                    this.stats.unseen_logs = logData.data.unseen;
-            } catch (e) {}
-        },
-
-        async loadStatus() {
-            this.loadingStatus = true;
-            try {
-                const data = await apiGet('/api/admin/server-status');
-                this.serverStatus = data?.status === 'success' ? data.data : null;
-            } catch (e) {
-                this.serverStatus = null;
-            }
-            this.loadingStatus = false;
-        },
-    };
-}
-</script>
+<?= $this->section('scripts') ?>
+<script src="/assets/modules/SystemAdmin/system-admin.js"></script>
+<?= $this->endSection() ?>
 
 <?= $this->endSection() ?>
