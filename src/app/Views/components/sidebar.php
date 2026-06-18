@@ -47,9 +47,8 @@ $currentUri = uri_string();
         <li class="sidebar__nav-group" x-show="user && (user.role === 'workspace_admin' || user.role === 'super_admin')" x-cloak>
             <div class="sidebar__nav-label">Lớp học</div>
             <ul>
-                <li class="sidebar__nav-item <?= $currentUri === 'admin/classrooms' ? 'sidebar__nav-item--active' : '' ?>"
-                    x-show="user && user.role === 'workspace_admin'" x-cloak>
-                    <a href="/admin/classrooms">🏫 Quản lý lớp học</a>
+                <li class="sidebar__nav-item <?= $currentUri === 'admin/classrooms' ? 'sidebar__nav-item--active' : '' ?>">
+                    <a href="/admin/classrooms">🏫 Danh sách lớp học</a>
                 </li>
                 <li class="sidebar__nav-item <?= str_starts_with($currentUri, 'admin/classrooms/students') ? 'sidebar__nav-item--active' : '' ?>">
                     <a href="/admin/classrooms/students">👥 Danh sách học sinh</a>
@@ -57,12 +56,14 @@ $currentUri = uri_string();
             </ul>
         </li>
 
-        <!-- Tính năng (modules) — chỉ super_admin -->
-        <?php if (! empty($sidebarModules)): ?>
+        <!-- Tính năng (modules) — chỉ super_admin, trừ classroom (đã có trong nhóm Lớp học) -->
+        <?php
+        $nonClassroomModules = array_filter($sidebarModules, fn($m) => ltrim($m->admin_url, '/') !== 'admin/classrooms');
+        if (! empty($nonClassroomModules)): ?>
         <li class="sidebar__nav-group" x-show="user && user.role === 'super_admin'" x-cloak>
             <div class="sidebar__nav-label">Tính năng</div>
             <ul>
-                <?php foreach ($sidebarModules as $mod): ?>
+                <?php foreach ($nonClassroomModules as $mod): ?>
                 <li class="sidebar__nav-item <?= str_starts_with($currentUri, ltrim($mod->admin_url, '/')) ? 'sidebar__nav-item--active' : '' ?>">
                     <a href="<?= esc($mod->admin_url) ?>">
                         <?= esc($mod->icon ?? '🧩') ?> <?= esc($mod->name) ?>
