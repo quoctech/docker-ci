@@ -180,18 +180,19 @@ class SubmissionController extends ApiController
             return $this->error('Chỉ giáo viên mới có thể chấm điểm.', 403);
         }
 
-        $score = $this->request->getVar('score');
+        $input    = $this->request->getRawInput();
+        $score    = $input['score'] ?? null;
+        $feedback = $input['feedback'] ?? null;
+
         if ($score === null || $score === '') {
             return $this->error('Vui lòng nhập điểm.', 422);
         }
 
-        $score    = (int) $score;
-        $maxScore = $assignment->max_score ?? 100;
+        $score    = (float) $score;
+        $maxScore = (float) ($assignment->max_score ?? 10);
         if ($score < 0 || $score > $maxScore) {
             return $this->error("Điểm phải từ 0 đến {$maxScore}.", 422);
         }
-
-        $feedback = $this->request->getVar('feedback');
         $this->submissionRepo->grade($submission->id, $score, $feedback);
 
         SystemLogger::info('Chấm điểm bài nộp', [

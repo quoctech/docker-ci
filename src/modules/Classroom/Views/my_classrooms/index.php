@@ -44,7 +44,7 @@
         <div class="card__body" style="padding:0">
             <table class="table table-card">
                 <tbody>
-                    <template x-for="m in pending" :key="m.classroom_id">
+                    <template x-for="m in pending" :key="m.classroom_uuid">
                         <tr>
                             <td data-label="Lớp học">
                                 <div style="font-weight:500;font-size:13px" x-text="m.classroom_name"></div>
@@ -66,7 +66,7 @@
 
     <!-- Approved classrooms -->
     <div x-show="!loading && classrooms.length > 0" class="grid grid--3">
-        <template x-for="c in classrooms" :key="c.classroom_id">
+        <template x-for="c in classrooms" :key="c.classroom_uuid">
             <div class="card classroom-card" style="cursor:pointer" @click="viewDetail(c)">
                 <div class="card__body" style="padding:18px 20px">
                     <div style="font-weight:600;font-size:14px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="c.classroom_name"></div>

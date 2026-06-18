@@ -61,7 +61,7 @@ class CreateClassroomTables extends Migration
             'title'         => ['type' => 'VARCHAR', 'constraint' => 255],
             'description'   => ['type' => 'TEXT', 'null' => true],
             'due_date'      => ['type' => 'DATETIME', 'null' => true],
-            'max_score'     => ['type' => 'SMALLINT', 'default' => 100],
+            'max_score'     => ['type' => 'SMALLINT', 'default' => 10],
             'is_published'  => ['type' => 'TINYINT', 'default' => 1],
             'created_at'    => ['type' => 'DATETIME', 'null' => true],
             'updated_at'    => ['type' => 'DATETIME', 'null' => true],

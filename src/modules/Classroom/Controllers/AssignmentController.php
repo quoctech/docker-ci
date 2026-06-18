@@ -77,7 +77,7 @@ class AssignmentController extends ApiController
             'title'        => $this->request->getPost('title'),
             'description'  => $this->request->getPost('description'),
             'due_date'     => $this->request->getPost('due_date') ?: null,
-            'max_score'    => $this->request->getPost('max_score') ?? 100,
+            'max_score'    => $this->request->getPost('max_score') ?? 10,
             'is_published' => (int) ($this->request->getPost('is_published') ?? 1),
             'file_path'    => $filePath,
         ]);

@@ -86,7 +86,7 @@ function classroomDetail(uuid) {
         loadingAssignments: false,
         showAssignmentForm: false,
         submittingA: false,
-        aForm: { title: '', description: '', due_date: '', max_score: 100, is_published: true, file: null },
+        aForm: { title: '', description: '', due_date: '', max_score: 10, is_published: true, file: null },
 
         get pendingMembers()  { return this.members.filter(m => m.status === 'pending'); },
         get approvedMembers() { return this.members.filter(m => m.status === 'approved'); },
@@ -147,7 +147,7 @@ function classroomDetail(uuid) {
         },
 
         openCreateAssignment() {
-            this.aForm = { title: '', description: '', due_date: '', max_score: 100, is_published: true, file: null };
+            this.aForm = { title: '', description: '', due_date: '', max_score: 10, is_published: true, file: null };
             this.showAssignmentForm = true;
         },
 
@@ -158,7 +158,7 @@ function classroomDetail(uuid) {
             fd.append('title',        this.aForm.title);
             fd.append('description',  this.aForm.description || '');
             fd.append('due_date',     this.aForm.due_date || '');
-            fd.append('max_score',    this.aForm.max_score || 100);
+            fd.append('max_score',    this.aForm.max_score || 10);
             fd.append('is_published', this.aForm.is_published ? '1' : '0');
             if (this.aForm.file) fd.append('assignment_file', this.aForm.file);
             const data = await apiRequest('/api/classrooms/' + this.uuid + '/assignments', {
@@ -274,10 +274,13 @@ function assignmentGrader(classroomUuid, assignmentUuid) {
         },
 
         async submitGrade() {
-            const score = this.gradeForm.score;
-            if (score === '' || score === null) { showToast('error', 'Vui lòng nhập điểm.'); return; }
-            if (score < 0 || score > this.assignment.max_score) {
-                showToast('error', 'Điểm phải từ 0 đến ' + this.assignment.max_score + '.'); return;
+            const score    = Number(this.gradeForm.score);
+            const maxScore = Number(this.assignment.max_score);
+            if (this.gradeForm.score === '' || this.gradeForm.score === null || isNaN(score)) {
+                showToast('error', 'Vui lòng nhập điểm.'); return;
+            }
+            if (score < 0 || score > maxScore) {
+                showToast('error', 'Điểm phải từ 0 đến ' + maxScore + '.'); return;
             }
             this.submittingGrade = true;
             const body = new URLSearchParams({ score, feedback: this.gradeForm.feedback || '' });
@@ -352,7 +355,7 @@ function myClassrooms() {
             if (!ok) return;
             const data = await apiRequest('/api/my-classrooms/' + m.classroom_uuid + '/leave', { method: 'DELETE' });
             if (data?.status === 'success') {
-                this.pending = this.pending.filter(x => x.classroom_id !== m.classroom_id);
+                this.pending = this.pending.filter(x => x.classroom_uuid !== m.classroom_uuid);
                 showToast('success', 'Đã hủy yêu cầu tham gia.');
             }
         },

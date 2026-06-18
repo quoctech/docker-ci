@@ -81,15 +81,16 @@ class ClassroomMemberRepository
     {
         $db = \Config\Database::connect();
         return $db->query("
-            SELECT c.uuid AS classroom_uuid, c.name AS classroom_name, c.subject, c.grade,
-                   cm.status, cm.joined_at,
+            SELECT c.id AS classroom_id, c.uuid AS classroom_uuid,
+                   c.name AS classroom_name, c.subject, c.grade,
+                   cm.id AS member_id, cm.status, cm.joined_at,
                    u.full_name AS teacher_name,
                    (SELECT COUNT(*) FROM assignments a WHERE a.classroom_id = c.id AND a.is_published = 1) AS assignment_count
             FROM classroom_members cm
             JOIN classrooms c ON c.id = cm.classroom_id AND c.is_active = 1
             JOIN users u ON u.uuid = c.teacher_uuid
             WHERE cm.student_uuid = ? AND cm.status != 'rejected'
-            ORDER BY cm.joined_at DESC
+            ORDER BY cm.joined_at DESC, cm.created_at DESC
         ", [$studentUuid])->getResultObject();
     }
 }
