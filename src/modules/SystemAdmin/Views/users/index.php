@@ -221,7 +221,7 @@
     <div x-show="showModulesModal" x-cloak
          class="confirm-overlay"
          @click.self="showModulesModal = false">
-        <div class="card" style="width:100%;max-width:480px;max-height:90vh;overflow-y:auto">
+        <div class="card" style="width:100%;max-width:640px;max-height:90vh;overflow-y:auto">
             <div class="card__header">
                 <h3>Phân quyền module</h3>
                 <button class="btn btn--ghost btn--sm" @click="showModulesModal = false">✕</button>
@@ -229,11 +229,11 @@
             <div class="card__body">
                 <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">
                     Người dùng: <strong x-text="modulesTarget?.full_name"></strong><br>
-                    Tích chọn module để cấp quyền truy cập riêng (ngoài quyền của role).
+                    Cấp quyền truy cập từng module. <b>Đọc</b> = thấy trong sidebar và Ctrl+K.
                 </p>
 
                 <div x-show="loadingModules" style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px">
-                    Đang tải danh sách module...
+                    Đang tải...
                 </div>
 
                 <div x-show="!loadingModules && modulesList.length === 0"
@@ -241,19 +241,51 @@
                     Không có module nào.
                 </div>
 
-                <div x-show="!loadingModules && modulesList.length > 0"
-                     style="display:flex;flex-direction:column;gap:8px">
-                    <template x-for="m in modulesList" :key="m.slug">
-                        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--color-border);border-radius:6px;cursor:pointer;transition:border-color 0.15s"
-                               :style="m.granted ? 'border-color:var(--color-primary);background:var(--color-primary-light)' : ''">
-                            <input type="checkbox" x-model="m.granted" style="width:16px;height:16px;flex-shrink:0">
-                            <div style="flex:1">
-                                <div style="font-size:13px;font-weight:500" x-text="m.name"></div>
-                                <div style="font-size:11px;color:var(--color-text-muted)" x-text="m.slug"></div>
-                            </div>
-                            <span x-show="!m.enabled" class="badge badge--secondary" style="font-size:10px">Tắt</span>
-                        </label>
-                    </template>
+                <div x-show="!loadingModules && modulesList.length > 0" style="overflow-x:auto">
+                    <table class="table" style="font-size:13px">
+                        <thead>
+                            <tr>
+                                <th>Module</th>
+                                <th style="text-align:center;width:52px">Đọc</th>
+                                <th style="text-align:center;width:52px">Ghi</th>
+                                <th style="text-align:center;width:52px">Sửa</th>
+                                <th style="text-align:center;width:52px">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="m in modulesList" :key="m.slug">
+                                <tr :style="!m.can_read ? 'opacity:0.5' : ''">
+                                    <td>
+                                        <div style="font-weight:500" x-text="m.name"></div>
+                                        <div style="font-size:11px;color:var(--color-text-muted);display:flex;align-items:center;gap:6px">
+                                            <span x-text="m.slug"></span>
+                                            <span x-show="!m.enabled" class="badge badge--secondary" style="font-size:10px">Tắt</span>
+                                        </div>
+                                    </td>
+                                    <td style="text-align:center">
+                                        <input type="checkbox" x-model="m.can_read"
+                                               @change="onReadChange(m)"
+                                               style="width:16px;height:16px;cursor:pointer">
+                                    </td>
+                                    <td style="text-align:center">
+                                        <input type="checkbox" x-model="m.can_write"
+                                               :disabled="!m.can_read"
+                                               style="width:16px;height:16px;cursor:pointer">
+                                    </td>
+                                    <td style="text-align:center">
+                                        <input type="checkbox" x-model="m.can_edit"
+                                               :disabled="!m.can_read"
+                                               style="width:16px;height:16px;cursor:pointer">
+                                    </td>
+                                    <td style="text-align:center">
+                                        <input type="checkbox" x-model="m.can_delete"
+                                               :disabled="!m.can_read"
+                                               style="width:16px;height:16px;cursor:pointer">
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">

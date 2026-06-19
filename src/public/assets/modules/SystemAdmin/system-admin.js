@@ -166,8 +166,8 @@ function userManager() {
         },
 
         async openModulesModal(user) {
-            this.modulesTarget = user;
-            this.modulesList   = [];
+            this.modulesTarget  = user;
+            this.modulesList    = [];
             this.showModulesModal = true;
             this.loadingModules   = true;
             const data = await apiGet('/api/admin/users/' + user.uuid + '/modules');
@@ -175,10 +175,27 @@ function userManager() {
             this.loadingModules = false;
         },
 
+        // Khi bỏ tích "Đọc" → xóa hết các quyền con
+        onReadChange(m) {
+            if (!m.can_read) {
+                m.can_write  = false;
+                m.can_edit   = false;
+                m.can_delete = false;
+            }
+        },
+
         async saveModules() {
             this.savingModules = true;
             const token   = getToken();
-            const modules = this.modulesList.filter(m => m.granted).map(m => m.slug);
+            const modules = this.modulesList
+                .filter(m => m.can_read)
+                .map(m => ({
+                    slug:       m.slug,
+                    can_read:   m.can_read   ? 1 : 0,
+                    can_write:  m.can_write  ? 1 : 0,
+                    can_edit:   m.can_edit   ? 1 : 0,
+                    can_delete: m.can_delete ? 1 : 0,
+                }));
             try {
                 const res  = await fetch('/api/admin/users/' + this.modulesTarget.uuid + '/modules', {
                     method:  'PUT',

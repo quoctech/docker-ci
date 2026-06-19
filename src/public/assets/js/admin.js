@@ -143,7 +143,7 @@ function adminApp() {
         })(),
         toasts: [],
         confirmDialog: { show: false, title: '', message: '', type: 'danger', confirmText: 'Xác nhận', _resolve: null },
-        userModules: null, // null = tất cả (super_admin), array = slugs được phép
+        userModules: null, // null = tất cả (super_admin), object = {slug: {can_read,can_write,can_edit,can_delete}}
 
         async init() {
             const token = getToken();
@@ -156,12 +156,19 @@ function adminApp() {
 
             const data = await apiGet('/api/auth/my-modules');
             if (data?.status === 'success') {
-                this.userModules = data.data.all ? null : (data.data.slugs || []);
+                this.userModules = data.data.all ? null : (data.data.permissions || {});
             }
         },
 
+        // Trả true nếu user có quyền đọc module (sidebar hiện, Ctrl+K tìm được)
         hasModule(slug) {
-            return this.userModules === null || this.userModules.includes(slug);
+            return this.userModules === null || (this.userModules[slug]?.can_read ?? false);
+        },
+
+        // Trả true nếu user có quyền cụ thể: can_read | can_write | can_edit | can_delete
+        hasModulePerm(slug, perm) {
+            if (this.userModules === null) return true;
+            return this.userModules[slug]?.[perm] ?? false;
         },
 
         confirmAction() {

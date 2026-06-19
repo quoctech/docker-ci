@@ -414,21 +414,20 @@ class AuthController extends ApiController
         return $this->success(null, 'Password changed. Please login again.');
     }
 
-    /** GET /api/auth/my-modules — danh sách module user có quyền truy cập */
+    /** GET /api/auth/my-modules — permissions map của user hiện tại */
     public function myModules(): ResponseInterface
     {
         $auth = $this->getAuthUser();
 
         if ($auth->role === 'super_admin') {
-            return $this->success(['all' => true, 'slugs' => []]);
+            return $this->success(['all' => true, 'permissions' => []]);
         }
 
         if ($auth->role === 'workspace_admin') {
-            $rows  = (new UserModulePermissionRepository())->getByUser($auth->sub);
-            $slugs = array_column(array_map(fn($r) => (array) $r, $rows), 'module_slug');
-            return $this->success(['all' => false, 'slugs' => $slugs]);
+            $map = (new UserModulePermissionRepository())->getPermissionsMap($auth->sub);
+            return $this->success(['all' => false, 'permissions' => $map]);
         }
 
-        return $this->success(['all' => false, 'slugs' => []]);
+        return $this->success(['all' => false, 'permissions' => []]);
     }
 }

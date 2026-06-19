@@ -123,6 +123,7 @@ class AdminAwesomeBarController extends ApiController
             $db->table('user_module_permissions')
                 ->select('module_slug')
                 ->where('user_uuid', $userUuid)
+                ->where('can_read', 1)
                 ->get()->getResultArray(),
             'module_slug'
         );
