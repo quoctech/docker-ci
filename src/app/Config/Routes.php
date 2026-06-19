@@ -34,9 +34,15 @@ $routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:classro
 
 // School Management module — page routes
 $routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:school-management'], function ($routes) {
+    $routes->get('school-management/centers',              '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::centers');
     $routes->get('school-management/branches',             '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branches');
     $routes->get('school-management/branches/(:segment)',  '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branchDetail/$1');
     $routes->get('school-management/rooms',                '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::rooms');
+});
+
+// Role Management module — page routes
+$routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:role-management'], function ($routes) {
+    $routes->get('role-management', '\Modules\RoleManagement\Controllers\RoleManagementPageController::index');
 });
 
 // Serve uploaded files (avatar)
@@ -112,9 +118,6 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->post('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::uploadAvatar/$1');
         $routes->delete('users/(:segment)/avatar', '\Modules\SystemAdmin\Controllers\UserManagementController::deleteAvatar/$1');
 
-        // User Module Permissions
-        $routes->get('users/(:segment)/modules', '\Modules\SystemAdmin\Controllers\UserModulePermissionController::getUserModules/$1');
-        $routes->put('users/(:segment)/modules', '\Modules\SystemAdmin\Controllers\UserModulePermissionController::setUserModules/$1');
     });
 
     // ------------------------------------------------------------------
@@ -162,8 +165,14 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         // AwesomeBar Search — mọi role đã đăng nhập đều dùng được, controller tự filter theo role
         $routes->get('admin/search', '\Modules\AwesomeBar\Controllers\AdminAwesomeBarController::search');
 
-        // School Management — Branch & Room CRUD
+        // School Management — Center, Branch & Room CRUD
         $routes->group('school-management', ['filter' => 'module_check:school-management'], function ($routes) {
+            $routes->get('centers',             '\Modules\SchoolManagement\Controllers\AdminCenterController::index');
+            $routes->post('centers',            '\Modules\SchoolManagement\Controllers\AdminCenterController::create');
+            $routes->get('centers/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminCenterController::show/$1');
+            $routes->put('centers/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminCenterController::update/$1');
+            $routes->delete('centers/(:segment)', '\Modules\SchoolManagement\Controllers\AdminCenterController::delete/$1');
+
             $routes->get('branches',             '\Modules\SchoolManagement\Controllers\AdminBranchController::index');
             $routes->post('branches',            '\Modules\SchoolManagement\Controllers\AdminBranchController::create');
             $routes->get('branches/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminBranchController::show/$1');
@@ -175,6 +184,18 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
             $routes->get('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::show/$1');
             $routes->put('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::update/$1');
             $routes->delete('rooms/(:segment)', '\Modules\SchoolManagement\Controllers\AdminRoomController::delete/$1');
+        });
+
+        // Role Management — Roles CRUD + apply to user
+        $routes->group('role-management', ['filter' => 'module_check:role-management'], function ($routes) {
+            $routes->get('roles',                              '\Modules\RoleManagement\Controllers\AdminRoleController::index');
+            $routes->post('roles',                             '\Modules\RoleManagement\Controllers\AdminRoleController::create');
+            $routes->get('roles/(:segment)',                   '\Modules\RoleManagement\Controllers\AdminRoleController::show/$1');
+            $routes->put('roles/(:segment)',                   '\Modules\RoleManagement\Controllers\AdminRoleController::update/$1');
+            $routes->delete('roles/(:segment)',                '\Modules\RoleManagement\Controllers\AdminRoleController::delete/$1');
+            $routes->get('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::getModules/$1');
+            $routes->put('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::setModules/$1');
+            $routes->post('roles/(:segment)/apply-to-user',   '\Modules\RoleManagement\Controllers\AdminRoleController::applyToUser/$1');
         });
 
         // VortexEngine — Subscription Management (super_admin + workspace_admin with permission)

@@ -6,18 +6,21 @@
 
 <?= $this->section('content') ?>
 
-<div x-data="branchDetail('<?= esc($branchUuid) ?>')" x-init="init()">
+<div x-data="branchDetail('<?= esc($branchUuid) ?>')" x-init="init()"
+     x-on:keydown.escape.window="showEditBranch = false; showRoomModal = false">
 
     <!-- Loading -->
     <div x-show="loading" style="text-align:center;padding:48px;color:var(--color-text-muted)">Đang tải...</div>
 
     <template x-if="!loading && branch">
         <div>
-            <!-- Branch info -->
+            <!-- Header -->
             <div class="page-header">
                 <div>
                     <h1 class="content__title" x-text="branch.name"></h1>
-                    <p class="content__subtitle" x-show="branch.address" x-text="branch.address"></p>
+                    <p class="content__subtitle" x-show="branch.center_name">
+                        Thuộc trung tâm: <strong x-text="branch.center_name"></strong>
+                    </p>
                 </div>
                 <div style="display:flex;gap:8px">
                     <button class="btn btn--secondary btn--sm" @click="openEditBranch()">✏ Sửa chi nhánh</button>
@@ -25,21 +28,38 @@
                 </div>
             </div>
 
-            <!-- Branch meta -->
-            <div class="card" style="margin-bottom:20px">
-                <div class="card__body" style="padding:16px 20px;display:flex;gap:32px;font-size:13px">
-                    <div x-show="branch.phone">
-                        <span style="color:var(--color-text-muted)">📞 Điện thoại:</span>
-                        <strong x-text="branch.phone" style="margin-left:6px"></strong>
+            <!-- Info cards -->
+            <div class="grid grid--4" style="margin-bottom:20px">
+                <div class="card">
+                    <div class="card__body" style="padding:14px 18px">
+                        <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px">PHÒNG HỌC</div>
+                        <div style="font-size:22px;font-weight:700" x-text="rooms.length"></div>
                     </div>
-                    <div x-show="branch.email">
-                        <span style="color:var(--color-text-muted)">✉ Email:</span>
-                        <strong x-text="branch.email" style="margin-left:6px"></strong>
+                </div>
+                <div class="card" x-show="branch.manager">
+                    <div class="card__body" style="padding:14px 18px">
+                        <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px">PHỤ TRÁCH</div>
+                        <div style="font-size:13px;font-weight:600" x-text="branch.manager"></div>
                     </div>
-                    <div>
-                        <span style="color:var(--color-text-muted)">🚪 Số phòng:</span>
-                        <strong x-text="rooms.length" style="margin-left:6px"></strong>
+                </div>
+                <div class="card" x-show="branch.phone">
+                    <div class="card__body" style="padding:14px 18px">
+                        <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px">ĐIỆN THOẠI</div>
+                        <div style="font-size:13px;font-weight:500" x-text="branch.phone"></div>
                     </div>
+                </div>
+                <div class="card" x-show="branch.email">
+                    <div class="card__body" style="padding:14px 18px">
+                        <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px">EMAIL</div>
+                        <div style="font-size:13px;font-weight:500;word-break:break-all" x-text="branch.email"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address -->
+            <div x-show="branch.address" class="card" style="margin-bottom:20px">
+                <div class="card__body" style="padding:12px 18px;font-size:13px;color:var(--color-text-muted)">
+                    📍 <span x-text="branch.address"></span>
                 </div>
             </div>
 
@@ -82,7 +102,7 @@
 
     <!-- ===== MODAL: Sửa chi nhánh ===== -->
     <div x-show="showEditBranch" x-cloak class="modal-overlay" @click.self="showEditBranch = false">
-        <div class="modal-box" style="max-width:500px">
+        <div class="modal-box" style="max-width:540px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
                 <h3 style="margin:0">Cập nhật chi nhánh</h3>
                 <button class="btn btn--ghost btn--sm" @click="showEditBranch = false">✕</button>
@@ -93,16 +113,20 @@
                     <input class="form-input" x-model="branchForm.name">
                 </div>
                 <div>
-                    <label class="form-label">Địa chỉ</label>
+                    <label class="form-label">Địa chỉ <span style="color:var(--color-danger)">*</span></label>
                     <input class="form-input" x-model="branchForm.address">
+                </div>
+                <div>
+                    <label class="form-label">Người phụ trách <span style="color:var(--color-danger)">*</span></label>
+                    <input class="form-input" x-model="branchForm.manager">
                 </div>
                 <div class="form-row">
                     <div style="flex:1">
-                        <label class="form-label">Điện thoại</label>
+                        <label class="form-label">Điện thoại <span style="color:var(--color-danger)">*</span></label>
                         <input class="form-input" x-model="branchForm.phone">
                     </div>
                     <div style="flex:1">
-                        <label class="form-label">Email</label>
+                        <label class="form-label">Email <span style="color:var(--color-danger)">*</span></label>
                         <input class="form-input" type="email" x-model="branchForm.email">
                     </div>
                 </div>

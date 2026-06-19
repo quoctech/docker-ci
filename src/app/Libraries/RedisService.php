@@ -104,6 +104,32 @@ class RedisService
         }
     }
 
+    /**
+     * Hủy toàn bộ session VÀ blacklist tất cả JWT đang active của 1 user.
+     *
+     * Dùng sau khi thay đổi quyền module — đảm bảo user bị đăng xuất ngay
+     * lập tức thay vì chờ JWT hết hạn tự nhiên (max 15 phút).
+     *
+     * @param string $userUuid User UUID
+     */
+    public static function forceLogoutUser(string $userUuid): void
+    {
+        $redis  = self::getInstance();
+        $prefix = REDIS_PREFIX_SESSION . "{$userUuid}:";
+        $keys   = $redis->keys($prefix . '*');
+
+        if (! empty($keys)) {
+            foreach ($keys as $key) {
+                $jti = substr($key, strlen($prefix));
+                $ttl = $redis->ttl($key);
+                if ($jti && $ttl > 0) {
+                    $redis->setex(REDIS_PREFIX_BLACKLIST . $jti, $ttl, '1');
+                }
+            }
+            $redis->del($keys);
+        }
+    }
+
     // =========================================================================
     // LOGIN ATTEMPT TRACKING (BRUTE FORCE PROTECTION)
     // =========================================================================

@@ -26,6 +26,23 @@ try {
 
 $currentUri = uri_string();
 
+// Tìm sidebar item active: segment-aware longest prefix match wins.
+// Ví dụ: /admin/classrooms/students → "Danh sách học sinh" thắng "Danh sách lớp học"
+//         /admin/classrooms/UUID    → "Danh sách lớp học" (không item nào dài hơn khớp)
+//         /admin/school-management/branches/UUID → "Quản lý chi nhánh"
+$activeUrl = null;
+$bestLen   = -1;
+foreach ($rawItems as $candidate) {
+    $path = ltrim($candidate->url, '/');
+    if ($path === '') continue;
+    if ($currentUri === $path || str_starts_with($currentUri . '/', $path . '/')) {
+        if (strlen($path) > $bestLen) {
+            $bestLen   = strlen($path);
+            $activeUrl = $candidate->url;
+        }
+    }
+}
+
 /**
  * Tính x-show Alpine.js cho một sidebar item dựa trên allowed_roles.
  */
@@ -51,16 +68,32 @@ function sidebarItemXshow(object $item): string
 }
 
 /**
- * Tính x-show Alpine.js cho nhóm nav dựa trên union roles của tất cả items trong nhóm.
+ * Tính x-show Alpine.js cho nhóm nav dựa trên union roles và module permissions của tất cả items.
+ *
+ * Với workspace_admin/super_admin: group chỉ hiện khi hasModule() trả true cho ít nhất 1 slug trong nhóm.
+ * hasModule() trả true cho super_admin (userModules=null) nên super_admin luôn thấy.
+ * workspace_admin chỉ thấy khi được cấp can_read cho ít nhất 1 module trong nhóm.
  */
 function sidebarGroupXshow(array $items): string
 {
-    $allRoles = array_unique(array_merge(...array_map(fn($i) => $i->roles_arr, $items)));
+    $allRoles    = array_unique(array_merge(...array_map(fn($i) => $i->roles_arr, $items)));
+    $moduleSlugs = array_unique(array_map(fn($i) => $i->module_slug, $items));
+
+    // OR của hasModule() cho từng slug trong nhóm
+    $hasAnyModule = implode(' || ', array_map(
+        fn($s) => "hasModule('" . esc($s, 'attr') . "')",
+        $moduleSlugs
+    ));
 
     $conds = [];
-    if (array_intersect(['workspace_admin', 'super_admin'], $allRoles)) {
-        $conds[] = "user.role === 'workspace_admin' || user.role === 'super_admin'";
+
+    $adminRoles = array_values(array_intersect(['workspace_admin', 'super_admin'], $allRoles));
+    if (! empty($adminRoles)) {
+        $roleConds = implode(' || ', array_map(fn($r) => "user.role === '$r'", $adminRoles));
+        // hasModule() trả true cho super_admin nên điều kiện này đúng cho cả hai role
+        $conds[] = "($roleConds) && ($hasAnyModule)";
     }
+
     if (in_array('user', $allRoles)) {
         $conds[] = "user.role === 'user'";
     }
@@ -108,9 +141,7 @@ function sidebarGroupXshow(array $items): string
             <div class="sidebar__nav-label"><?= esc($groupLabel) ?></div>
             <ul>
                 <?php foreach ($items as $item):
-                    $isActive = $item->match_exact
-                        ? ($currentUri === ltrim($item->url, '/'))
-                        : str_starts_with($currentUri, ltrim($item->url, '/'));
+                    $isActive = ($item->url === $activeUrl);
                 ?>
                 <li class="sidebar__nav-item <?= $isActive ? 'sidebar__nav-item--active' : '' ?>"
                     x-show="<?= sidebarItemXshow($item) ?>" x-cloak>

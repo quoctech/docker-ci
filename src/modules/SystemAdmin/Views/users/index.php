@@ -7,7 +7,7 @@
 <?= $this->section('content') ?>
 
 <div x-data="userManager()" x-init="loadUsers()"
-     x-on:keydown.escape.window="showModal = false; showResetModal = false; showModulesModal = false">
+     x-on:keydown.escape.window="showModal = false; showResetModal = false; showApplyRoleModal = false">
     <!-- Header -->
     <div class="page-header">
         <div>
@@ -102,7 +102,7 @@
                                     <div style="display:flex;gap:4px;flex-wrap:nowrap">
                                         <button class="btn btn--ghost btn--sm" @click="openEditModal(u)" title="Chỉnh sửa">✏</button>
                                         <button class="btn btn--ghost btn--sm" @click="openResetPasswordModal(u)" title="Đặt lại mật khẩu">🔑</button>
-                                        <button class="btn btn--ghost btn--sm" @click="openModulesModal(u)" title="Phân quyền module">🔐</button>
+                                        <button class="btn btn--ghost btn--sm" @click="openApplyRoleModal(u)" title="Áp dụng vai trò" x-show="u.role === 'workspace_admin'">🎭</button>
                                         <button class="btn btn--ghost btn--sm" @click="toggleStatus(u)" :title="u.status === 'active' ? 'Khóa' : 'Mở khóa'">
                                             <span x-text="u.status === 'active' ? '🔒' : '🔓'"></span>
                                         </button>
@@ -217,81 +217,50 @@
             </div>
         </div>
     </div>
-    <!-- Module Permissions Modal -->
-    <div x-show="showModulesModal" x-cloak
+    <!-- Apply Role Modal -->
+    <div x-show="showApplyRoleModal" x-cloak
          class="confirm-overlay"
-         @click.self="showModulesModal = false">
-        <div class="card" style="width:100%;max-width:640px;max-height:90vh;overflow-y:auto">
+         @click.self="showApplyRoleModal = false">
+        <div class="card" style="width:100%;max-width:480px">
             <div class="card__header">
-                <h3>Phân quyền module</h3>
-                <button class="btn btn--ghost btn--sm" @click="showModulesModal = false">✕</button>
+                <div>
+                    <h3 style="margin:0">Áp dụng vai trò</h3>
+                    <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">
+                        Người dùng: <strong x-text="applyRoleTarget?.full_name"></strong>
+                    </div>
+                </div>
+                <button class="btn btn--ghost btn--sm" @click="showApplyRoleModal = false">✕</button>
             </div>
             <div class="card__body">
                 <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">
-                    Người dùng: <strong x-text="modulesTarget?.full_name"></strong><br>
-                    Cấp quyền truy cập từng module. <b>Đọc</b> = thấy trong sidebar và Ctrl+K.
+                    Chọn vai trò để áp dụng. Phân quyền module hiện tại của người dùng sẽ bị ghi đè bằng quyền của vai trò này.
                 </p>
 
-                <div x-show="loadingModules" style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px">
-                    Đang tải...
+                <div x-show="loadingRoles" style="text-align:center;padding:16px;color:var(--color-text-muted);font-size:13px">Đang tải...</div>
+
+                <div x-show="!loadingRoles && rolesList.length === 0"
+                     style="text-align:center;padding:16px;color:var(--color-text-muted);font-size:13px">
+                    Chưa có vai trò nào. Hãy tạo vai trò trong module Quản lý vai trò.
                 </div>
 
-                <div x-show="!loadingModules && modulesList.length === 0"
-                     style="text-align:center;padding:24px;color:var(--color-text-muted);font-size:13px">
-                    Không có module nào.
+                <div x-show="!loadingRoles && rolesList.length > 0" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+                    <template x-for="r in rolesList" :key="r.uuid">
+                        <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:2px solid;border-radius:8px;cursor:pointer"
+                               :style="selectedRoleUuid === r.uuid ? 'border-color:var(--color-primary);background:var(--color-primary-light)' : 'border-color:var(--color-border)'">
+                            <input type="radio" :value="r.uuid" x-model="selectedRoleUuid" style="display:none">
+                            <div style="flex:1">
+                                <div style="font-weight:600;font-size:13px" x-text="r.name"></div>
+                                <div style="font-size:11px;color:var(--color-text-muted)" x-text="(r.description || '') + (r.module_count > 0 ? ' · ' + r.module_count + ' module' : '')"></div>
+                            </div>
+                            <div x-show="selectedRoleUuid === r.uuid" style="color:var(--color-primary);font-size:18px">✓</div>
+                        </label>
+                    </template>
                 </div>
 
-                <div x-show="!loadingModules && modulesList.length > 0" style="overflow-x:auto">
-                    <table class="table" style="font-size:13px">
-                        <thead>
-                            <tr>
-                                <th>Module</th>
-                                <th style="text-align:center;width:52px">Đọc</th>
-                                <th style="text-align:center;width:52px">Ghi</th>
-                                <th style="text-align:center;width:52px">Sửa</th>
-                                <th style="text-align:center;width:52px">Xóa</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="m in modulesList" :key="m.slug">
-                                <tr :style="!m.can_read ? 'opacity:0.5' : ''">
-                                    <td>
-                                        <div style="font-weight:500" x-text="m.name"></div>
-                                        <div style="font-size:11px;color:var(--color-text-muted);display:flex;align-items:center;gap:6px">
-                                            <span x-text="m.slug"></span>
-                                            <span x-show="!m.enabled" class="badge badge--secondary" style="font-size:10px">Tắt</span>
-                                        </div>
-                                    </td>
-                                    <td style="text-align:center">
-                                        <input type="checkbox" x-model="m.can_read"
-                                               @change="onReadChange(m)"
-                                               style="width:16px;height:16px;cursor:pointer">
-                                    </td>
-                                    <td style="text-align:center">
-                                        <input type="checkbox" x-model="m.can_write"
-                                               :disabled="!m.can_read"
-                                               style="width:16px;height:16px;cursor:pointer">
-                                    </td>
-                                    <td style="text-align:center">
-                                        <input type="checkbox" x-model="m.can_edit"
-                                               :disabled="!m.can_read"
-                                               style="width:16px;height:16px;cursor:pointer">
-                                    </td>
-                                    <td style="text-align:center">
-                                        <input type="checkbox" x-model="m.can_delete"
-                                               :disabled="!m.can_read"
-                                               style="width:16px;height:16px;cursor:pointer">
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-                    <button class="btn btn--secondary btn--sm" @click="showModulesModal = false">Hủy</button>
-                    <button class="btn btn--primary btn--sm" :disabled="savingModules" @click="saveModules()">
-                        <span x-text="savingModules ? 'Đang lưu...' : 'Lưu phân quyền'"></span>
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button class="btn btn--secondary btn--sm" @click="showApplyRoleModal = false">Hủy</button>
+                    <button class="btn btn--primary btn--sm" :disabled="applyingRole || !selectedRoleUuid" @click="doApplyRole()">
+                        <span x-text="applyingRole ? 'Đang áp dụng...' : 'Áp dụng vai trò'"></span>
                     </button>
                 </div>
             </div>

@@ -4,13 +4,13 @@ namespace Modules\SchoolManagement\Models;
 
 use CodeIgniter\Model;
 
-class BranchModel extends Model
+class CenterModel extends Model
 {
-    protected $table         = 'branches';
+    protected $table         = 'centers';
     protected $primaryKey    = 'id';
     protected $returnType    = 'object';
     protected $useTimestamps = true;
     protected $allowedFields = [
-        'uuid', 'center_id', 'name', 'address', 'phone', 'email', 'manager', 'is_active',
+        'uuid', 'name', 'address', 'phone', 'email', 'is_active',
     ];
 }

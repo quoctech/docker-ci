@@ -59,11 +59,13 @@ function userManager() {
         showResetModal: false,
         resetTarget: null,
         resetForm: { new_password: '' },
-        showModulesModal: false,
-        modulesTarget: null,
-        modulesList: [],
-        loadingModules: false,
-        savingModules: false,
+
+        showApplyRoleModal: false,
+        applyRoleTarget: null,
+        rolesList: [],
+        loadingRoles: false,
+        selectedRoleUuid: '',
+        applyingRole: false,
 
         roleLabel(role) {
             const map = { super_admin: 'Super Admin', workspace_admin: 'Giáo viên', user: 'Người dùng' };
@@ -165,54 +167,33 @@ function userManager() {
             this.saving = false;
         },
 
-        async openModulesModal(user) {
-            this.modulesTarget  = user;
-            this.modulesList    = [];
-            this.showModulesModal = true;
-            this.loadingModules   = true;
-            const data = await apiGet('/api/admin/users/' + user.uuid + '/modules');
-            if (data?.status === 'success') this.modulesList = data.data;
-            this.loadingModules = false;
+        async openApplyRoleModal(user) {
+            this.applyRoleTarget  = user;
+            this.selectedRoleUuid = '';
+            this.rolesList        = [];
+            this.showApplyRoleModal = true;
+            this.loadingRoles      = true;
+            const data = await apiGet('/api/role-management/roles');
+            if (data?.status === 'success') this.rolesList = data.data;
+            this.loadingRoles = false;
         },
 
-        // Khi bỏ tích "Đọc" → xóa hết các quyền con
-        onReadChange(m) {
-            if (!m.can_read) {
-                m.can_write  = false;
-                m.can_edit   = false;
-                m.can_delete = false;
+        async doApplyRole() {
+            if (!this.selectedRoleUuid) return;
+            this.applyingRole = true;
+            const res  = await fetch('/api/role-management/roles/' + this.selectedRoleUuid + '/apply-to-user', {
+                method:  'POST',
+                headers: { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ user_uuid: this.applyRoleTarget.uuid }),
+            });
+            const data = await res.json();
+            this.applyingRole = false;
+            if (data?.status === 'success') {
+                showToast('success', data.message);
+                this.showApplyRoleModal = false;
+            } else {
+                showToast('error', data?.message || 'Có lỗi xảy ra.');
             }
-        },
-
-        async saveModules() {
-            this.savingModules = true;
-            const token   = getToken();
-            const modules = this.modulesList
-                .filter(m => m.can_read)
-                .map(m => ({
-                    slug:       m.slug,
-                    can_read:   m.can_read   ? 1 : 0,
-                    can_write:  m.can_write  ? 1 : 0,
-                    can_edit:   m.can_edit   ? 1 : 0,
-                    can_delete: m.can_delete ? 1 : 0,
-                }));
-            try {
-                const res  = await fetch('/api/admin/users/' + this.modulesTarget.uuid + '/modules', {
-                    method:  'PUT',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ modules }),
-                });
-                const data = await res.json();
-                if (data?.status === 'success') {
-                    showToast('success', 'Đã cập nhật phân quyền module.');
-                    this.showModulesModal = false;
-                } else {
-                    showToast('error', data?.message || 'Có lỗi xảy ra.');
-                }
-            } catch (e) {
-                showToast('error', 'Lỗi kết nối.');
-            }
-            this.savingModules = false;
         },
 
         openResetPasswordModal(user) {

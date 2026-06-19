@@ -61,7 +61,25 @@ class UserModulePermissionRepository
     }
 
     /**
+     * Kiểm tra một quyền cụ thể (can_read | can_write | can_edit | can_delete).
+     */
+    public function hasGranularPermission(string $userUuid, string $moduleSlug, string $permission): bool
+    {
+        $allowed = ['can_read', 'can_write', 'can_edit', 'can_delete'];
+        if (! in_array($permission, $allowed, true)) {
+            return false;
+        }
+
+        return (bool) $this->db->table('user_module_permissions')
+            ->where('user_uuid', $userUuid)
+            ->where('module_slug', $moduleSlug)
+            ->where($permission, 1)
+            ->countAllResults();
+    }
+
+    /**
      * Ghi đè toàn bộ permissions cho user trong một transaction.
+     * Ném RuntimeException nếu transaction thất bại.
      *
      * @param array $modulePermissions [{slug, can_read, can_write, can_edit, can_delete}, ...]
      */
@@ -90,5 +108,9 @@ class UserModulePermissionRepository
         }
 
         $this->db->transComplete();
+
+        if ($this->db->transStatus() === false) {
+            throw new \RuntimeException('Lưu phân quyền module thất bại. Vui lòng thử lại.');
+        }
     }
 }

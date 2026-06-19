@@ -20,4 +20,9 @@ class SchoolManagementPageController extends BaseController
     {
         return view('Modules\SchoolManagement\Views\rooms/index');
     }
+
+    public function centers(): string
+    {
+        return view('Modules\SchoolManagement\Views\centers/index');
+    }
 }
