@@ -6,30 +6,10 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use Modules\SystemAdmin\Models\ModuleModel;
+use Modules\SystemAdmin\Repositories\UserModulePermissionRepository;
 
-/**
- * ModuleCheckFilter - Dynamic routing dựa trên trạng thái module.
- *
- * Kiểm tra module có đang bật không trước khi cho request đi tiếp.
- * Nếu module bị tắt → trả 503 Service Unavailable.
- *
- * Flow: Request → ModuleCheckFilter → Redis cache (fast) → DB fallback → Response
- *
- * Cách dùng trong Routes:
- * - ['filter' => 'module_check:game-engine']           → Check 1 module
- * - ['filter' => 'module_check:game-engine,workspace'] → Check nhiều module
- *
- * Admin bật/tắt module qua API → Redis sync → request tiếp theo tự động apply.
- */
 class ModuleCheckFilter implements FilterInterface
 {
-    /**
-     * Kiểm tra tất cả module yêu cầu có đang enabled không.
-     *
-     * @param RequestInterface $request   HTTP request
-     * @param array|null       $arguments Danh sách module slug cần check
-     * @return ResponseInterface|null null = pass, 503 = module disabled
-     */
     public function before(RequestInterface $request, $arguments = null)
     {
         if (empty($arguments)) {
@@ -42,10 +22,26 @@ class ModuleCheckFilter implements FilterInterface
             if (! $moduleModel->isEnabled($slug)) {
                 return service('response')
                     ->setStatusCode(503)
-                    ->setJSON([
-                        'status'  => 'error',
-                        'message' => 'This service is currently unavailable.',
-                    ]);
+                    ->setJSON(['status' => 'error', 'message' => 'Module không khả dụng.']);
+            }
+        }
+
+        // Chỉ super_admin và workspace_admin (có quyền) được truy cập module APIs
+        $authUser = $request->authUser ?? null;
+        if ($authUser && $authUser->role !== 'super_admin') {
+            if ($authUser->role !== 'workspace_admin') {
+                return service('response')
+                    ->setStatusCode(403)
+                    ->setJSON(['status' => 'error', 'message' => 'Bạn không có quyền truy cập module này.']);
+            }
+            // workspace_admin phải có quyền cụ thể trên module
+            $permRepo = new UserModulePermissionRepository();
+            foreach ($arguments as $slug) {
+                if (! $permRepo->hasPermission($authUser->sub, $slug)) {
+                    return service('response')
+                        ->setStatusCode(403)
+                        ->setJSON(['status' => 'error', 'message' => 'Bạn không có quyền truy cập module này.']);
+                }
             }
         }
 

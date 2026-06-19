@@ -59,6 +59,22 @@ services:
     networks:
       - ci4_network
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ci4_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root
+    networks:
+      - ci4_network
+    depends_on:
+      - db
+
   db:
     image: mariadb:11
     container_name: ci4_db

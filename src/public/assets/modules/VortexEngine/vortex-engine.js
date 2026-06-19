@@ -40,6 +40,18 @@ function subscriptionManager() {
         savingSub: false,
 
         async init() {
+            const user = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; } })();
+            if (!user || (user.role !== 'super_admin' && user.role !== 'workspace_admin')) {
+                window.location.href = '/admin';
+                return;
+            }
+            if (user.role === 'workspace_admin') {
+                const mods = await apiGet('/api/auth/my-modules');
+                if (!mods?.data?.slugs?.includes('vortex-engine')) {
+                    window.location.href = '/admin/classrooms';
+                    return;
+                }
+            }
             this.loadingPkg = true;
             const data = await apiGet('/api/admin/subscriptions/packages');
             if (data?.status === 'success') this.activePackages = data.data;
@@ -67,11 +79,11 @@ function subscriptionManager() {
             this._studentQuery = q;
             this.loadingStudents = true;
             const params = new URLSearchParams({
-                role: 'user', per_page: 10, page: this._studentPage,
+                per_page: 10, page: this._studentPage,
                 exclude_subscribed: 1,
             });
             if (q) params.set('search', q);
-            const data = await apiGet('/api/admin/users?' + params);
+            const data = await apiGet('/api/admin/subscriptions/students?' + params);
             if (data?.status === 'success') {
                 const users = data.data.users || [];
                 this.filteredStudents = reset ? users : [...this.filteredStudents, ...users];

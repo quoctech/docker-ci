@@ -30,9 +30,44 @@ class AdminAwesomeBarController extends ApiController
      */
     public function search(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $q = trim($this->request->getGet('q') ?? '');
+        $q    = trim($this->request->getGet('q') ?? '');
+        $auth = $this->getAuthUser();
+        $isSuperAdmin = $auth->role === 'super_admin';
+        $isStudent    = $auth->role === 'user';
 
         $enabledSlugs = $this->getEnabledModuleSlugs();
+
+        // Học sinh: chỉ tìm lớp học của mình (nếu module classroom đang bật)
+        if ($isStudent) {
+            $classroomActive = in_array('classroom', $enabledSlugs);
+
+            if ($q === '') {
+                $pages = $classroomActive
+                    ? array_map(fn($i) => $this->formatItem($i), $this->repo->getActiveForModules(['classroom']))
+                    : [];
+                $myClassrooms = $classroomActive ? $this->searchMyClassrooms('', $auth->sub) : [];
+                return $this->respond([
+                    'status' => 'success',
+                    'data'   => ['pages' => array_merge($pages, $myClassrooms), 'users' => [], 'modules' => [], 'configs' => []],
+                ]);
+            }
+
+            return $this->respond([
+                'status' => 'success',
+                'data'   => [
+                    'pages'   => $classroomActive ? $this->searchMyClassrooms($q, $auth->sub) : [],
+                    'users'   => [],
+                    'modules' => [],
+                    'configs' => [],
+                ],
+            ]);
+        }
+
+        // workspace_admin: lọc pages theo module được cấp quyền, không trả users/modules/configs
+        if (! $isSuperAdmin) {
+            $permittedSlugs = $this->getPermittedSlugsForUser($auth->sub);
+            $enabledSlugs   = array_intersect($enabledSlugs, $permittedSlugs);
+        }
 
         if ($q === '') {
             $pages = array_map(fn($i) => $this->formatItem($i), $this->repo->getActiveForModules($enabledSlugs));
@@ -46,20 +81,65 @@ class AdminAwesomeBarController extends ApiController
             'status' => 'success',
             'data'   => [
                 'pages'   => $this->searchPages($q, $enabledSlugs),
-                'users'   => $this->searchUsers($q),
-                'modules' => $this->searchModules($q),
-                'configs' => $this->searchConfigs($q),
+                'users'   => $isSuperAdmin ? $this->searchUsers($q)   : [],
+                'modules' => $isSuperAdmin ? $this->searchModules($q) : [],
+                'configs' => $isSuperAdmin ? $this->searchConfigs($q) : [],
             ],
         ]);
+    }
+
+    private function searchMyClassrooms(string $q, string $studentUuid): array
+    {
+        $db      = \Config\Database::connect();
+        $builder = $db->table('classroom_members cm')
+            ->select('c.uuid, c.name, c.subject, c.grade', false)
+            ->join('classrooms c', 'c.id = cm.classroom_id', 'inner', false)
+            ->where('cm.student_uuid', $studentUuid)
+            ->where('cm.status', 'approved')
+            ->where('c.is_active', 1);
+
+        if ($q !== '') {
+            $builder->groupStart()
+                ->like('c.name', $q)
+                ->orLike('c.subject', $q)
+                ->groupEnd();
+        }
+
+        $rows = $builder->orderBy('cm.joined_at', 'DESC')->get(8)->getResult();
+
+        return array_map(fn($c) => [
+            'type'     => 'page',
+            'title'    => $c->name,
+            'subtitle' => ($c->subject ?: '') . ($c->grade ? ' · Lớp ' . $c->grade : ''),
+            'url'      => '/admin/my-classrooms/' . $c->uuid,
+            'icon'     => '📚',
+        ], $rows);
+    }
+
+    private function getPermittedSlugsForUser(string $userUuid): array
+    {
+        $db = \Config\Database::connect();
+        return array_column(
+            $db->table('user_module_permissions')
+                ->select('module_slug')
+                ->where('user_uuid', $userUuid)
+                ->get()->getResultArray(),
+            'module_slug'
+        );
     }
 
     // =========================================================================
 
     private function getEnabledModuleSlugs(): array
     {
-        $db   = \Config\Database::connect();
-        $rows = $db->table('modules')->select('slug')->where('is_enabled', 1)->get()->getResultArray();
-        return array_column($rows, 'slug');
+        $db = \Config\Database::connect();
+        return array_column(
+            $db->table('modules')
+                ->select('slug')
+                ->where('is_enabled', 1)
+                ->get()->getResultArray(),
+            'slug'
+        );
     }
 
     private function searchPages(string $q, array $enabledSlugs): array

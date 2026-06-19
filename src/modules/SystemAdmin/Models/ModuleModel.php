@@ -80,15 +80,20 @@ class ModuleModel extends Model
     }
 
     /**
-     * Lấy các module đang bật có admin_url để hiển thị trên sidebar.
+     * Lấy tất cả sidebar items của các module đang bật, đã sắp xếp theo sort_order.
+     * Dùng trong sidebar.php — không cần sửa view khi thêm module mới,
+     * chỉ cần insert vào bảng module_sidebar_items trong migration của module đó.
      */
-    public function getEnabledWithAdminUrl(): array
+    public function getSidebarItems(): array
     {
-        return $this->where('is_enabled', 1)
-                    ->where('is_core', 0)
-                    ->where('admin_url IS NOT NULL', null, false)
-                    ->orderBy('sort_order', 'ASC')
-                    ->findAll();
+        $db = \Config\Database::connect();
+        return $db->table('module_sidebar_items msi')
+            ->select('msi.module_slug, msi.group_label, msi.label, msi.url, msi.icon, msi.allowed_roles, msi.match_exact, msi.sort_order', false)
+            ->join('modules m', 'm.slug = msi.module_slug', 'inner', false)
+            ->where('m.is_enabled', 1)
+            ->orderBy('msi.sort_order', 'ASC')
+            ->get()
+            ->getResultObject();
     }
 
     /**

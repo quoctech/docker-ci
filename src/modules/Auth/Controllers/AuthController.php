@@ -8,6 +8,8 @@ use App\Libraries\RedisService;
 use CodeIgniter\HTTP\ResponseInterface;
 use Modules\Auth\Models\UserModel;
 use Modules\Auth\Models\RefreshTokenModel;
+use Modules\SystemAdmin\Models\ModuleModel;
+use Modules\SystemAdmin\Repositories\UserModulePermissionRepository;
 
 /**
  * AuthController - Xử lý xác thực người dùng.
@@ -410,5 +412,23 @@ class AuthController extends ApiController
         RedisService::revokeAllSessions($user->uuid);
 
         return $this->success(null, 'Password changed. Please login again.');
+    }
+
+    /** GET /api/auth/my-modules — danh sách module user có quyền truy cập */
+    public function myModules(): ResponseInterface
+    {
+        $auth = $this->getAuthUser();
+
+        if ($auth->role === 'super_admin') {
+            return $this->success(['all' => true, 'slugs' => []]);
+        }
+
+        if ($auth->role === 'workspace_admin') {
+            $rows  = (new UserModulePermissionRepository())->getByUser($auth->sub);
+            $slugs = array_column(array_map(fn($r) => (array) $r, $rows), 'module_slug');
+            return $this->success(['all' => false, 'slugs' => $slugs]);
+        }
+
+        return $this->success(['all' => false, 'slugs' => []]);
     }
 }

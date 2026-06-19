@@ -22,14 +22,21 @@ $routes->group('admin', ['namespace' => ''], function ($routes) {
     $routes->get('system-logs',  '\Modules\SystemLog\Controllers\SystemLogPageController::index');
 });
 
-// Classroom module — page routes
-$routes->group('admin', ['namespace' => ''], function ($routes) {
+// Classroom module — page routes (bị chặn nếu module tắt)
+$routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:classroom'], function ($routes) {
     $routes->get('classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::index');
     $routes->get('classrooms/students', '\Modules\Classroom\Controllers\ClassroomPageController::students');
     $routes->get('classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::detail/$1');
     $routes->get('classrooms/(:segment)/assignments/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::assignment/$1/$2');
     $routes->get('my-classrooms', '\Modules\Classroom\Controllers\ClassroomPageController::myClassrooms');
     $routes->get('my-classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomPageController::myClassroomDetail/$1');
+});
+
+// School Management module — page routes
+$routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:school-management'], function ($routes) {
+    $routes->get('school-management/branches',             '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branches');
+    $routes->get('school-management/branches/(:segment)',  '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branchDetail/$1');
+    $routes->get('school-management/rooms',                '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::rooms');
 });
 
 // Serve uploaded files (avatar)
@@ -55,6 +62,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
     // ------------------------------------------------------------------
     $routes->group('auth', ['filter' => 'auth'], function ($routes) {
         $routes->get('me', '\Modules\Auth\Controllers\AuthController::me');
+        $routes->get('my-modules', '\Modules\Auth\Controllers\AuthController::myModules');
         $routes->post('logout', '\Modules\Auth\Controllers\AuthController::logout');
         $routes->post('logout-all', '\Modules\Auth\Controllers\AuthController::logoutAll');
         $routes->put('change-password', '\Modules\Auth\Controllers\AuthController::changePassword');
@@ -79,23 +87,10 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->put('configs/(:any)', '\Modules\SystemAdmin\Controllers\SiteConfigController::update/$1');
         $routes->delete('configs/(:any)', '\Modules\SystemAdmin\Controllers\SiteConfigController::delete/$1');
 
-        // VortexEngine — Subscription Management
-        $routes->group('subscriptions', ['filter' => 'module_check:vortex-engine'], function ($routes) {
-            $routes->post('activate', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::activate');
-            $routes->put('(:num)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updateSubscription/$1');
-            $routes->get('list', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::listSubscriptions');
-            $routes->get('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::packages');
-            $routes->get('packages/all', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::allPackages');
-            $routes->post('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::createPackage');
-            $routes->put('packages/(:segment)/toggle', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::togglePackage/$1');
-            $routes->put('packages/(:segment)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updatePackage/$1');
-        });
 
         // Server Status
         $routes->get('server-status', '\Modules\SystemAdmin\Controllers\ServerStatusController::index');
 
-        // Search (Awesome Bar)
-        $routes->get('search', '\Modules\AwesomeBar\Controllers\AdminAwesomeBarController::search');
 
         // System Log
         $routes->get('system-logs/stats', '\Modules\SystemLog\Controllers\AdminSystemLogController::stats');
@@ -163,5 +158,36 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->get('my-classrooms/(:segment)', '\Modules\Classroom\Controllers\ClassroomMemberController::show/$1');
         $routes->get('my-classrooms/(:segment)/assignments', '\Modules\Classroom\Controllers\AssignmentController::index/$1');
         $routes->delete('my-classrooms/(:segment)/leave', '\Modules\Classroom\Controllers\ClassroomMemberController::leave/$1');
+
+        // AwesomeBar Search — mọi role đã đăng nhập đều dùng được, controller tự filter theo role
+        $routes->get('admin/search', '\Modules\AwesomeBar\Controllers\AdminAwesomeBarController::search');
+
+        // School Management — Branch & Room CRUD
+        $routes->group('school-management', ['filter' => 'module_check:school-management'], function ($routes) {
+            $routes->get('branches',             '\Modules\SchoolManagement\Controllers\AdminBranchController::index');
+            $routes->post('branches',            '\Modules\SchoolManagement\Controllers\AdminBranchController::create');
+            $routes->get('branches/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminBranchController::show/$1');
+            $routes->put('branches/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminBranchController::update/$1');
+            $routes->delete('branches/(:segment)', '\Modules\SchoolManagement\Controllers\AdminBranchController::delete/$1');
+
+            $routes->get('rooms',             '\Modules\SchoolManagement\Controllers\AdminRoomController::index');
+            $routes->post('rooms',            '\Modules\SchoolManagement\Controllers\AdminRoomController::create');
+            $routes->get('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::show/$1');
+            $routes->put('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::update/$1');
+            $routes->delete('rooms/(:segment)', '\Modules\SchoolManagement\Controllers\AdminRoomController::delete/$1');
+        });
+
+        // VortexEngine — Subscription Management (super_admin + workspace_admin with permission)
+        $routes->group('admin/subscriptions', ['filter' => 'module_check:vortex-engine'], function ($routes) {
+            $routes->post('activate', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::activate');
+            $routes->put('(:num)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updateSubscription/$1');
+            $routes->get('list', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::listSubscriptions');
+            $routes->get('students', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::students');
+            $routes->get('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::packages');
+            $routes->get('packages/all', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::allPackages');
+            $routes->post('packages', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::createPackage');
+            $routes->put('packages/(:segment)/toggle', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::togglePackage/$1');
+            $routes->put('packages/(:segment)', '\Modules\VortexEngine\Controllers\AdminSubscriptionController::updatePackage/$1');
+        });
     });
 });

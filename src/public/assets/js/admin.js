@@ -143,8 +143,9 @@ function adminApp() {
         })(),
         toasts: [],
         confirmDialog: { show: false, title: '', message: '', type: 'danger', confirmText: 'Xác nhận', _resolve: null },
+        userModules: null, // null = tất cả (super_admin), array = slugs được phép
 
-        init() {
+        async init() {
             const token = getToken();
             if (!token) {
                 redirectToLogin();
@@ -152,6 +153,15 @@ function adminApp() {
             }
             _toastContainer = this.toasts;
             _confirmApp = this;
+
+            const data = await apiGet('/api/auth/my-modules');
+            if (data?.status === 'success') {
+                this.userModules = data.data.all ? null : (data.data.slugs || []);
+            }
+        },
+
+        hasModule(slug) {
+            return this.userModules === null || this.userModules.includes(slug);
         },
 
         confirmAction() {

@@ -256,6 +256,57 @@ class AdminSubscriptionController extends ApiController
     }
 
     /**
+     * GET /api/admin/subscriptions/students
+     *
+     * Tìm kiếm học sinh (role=user) phục vụ cho form kích hoạt gói học.
+     * Params: search, page, per_page, exclude_subscribed
+     */
+    public function students(): ResponseInterface
+    {
+        $search           = $this->request->getGet('search') ?? '';
+        $page             = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage          = min((int) ($this->request->getGet('per_page') ?? 10), 50);
+        $excludeSubscribed = (bool) $this->request->getGet('exclude_subscribed');
+
+        $db      = \Config\Database::connect();
+        $builder = $db->table('users u')
+            ->select('u.uuid, u.full_name, u.email, u.username, u.grade', false)
+            ->where('u.role', 'user')
+            ->where('u.status', 'active');
+
+        if (!empty($search)) {
+            $builder->groupStart()
+                ->like('u.full_name', $search)
+                ->orLike('u.email', $search)
+                ->orLike('u.username', $search)
+                ->groupEnd();
+        }
+
+        if ($excludeSubscribed) {
+            $builder->where(
+                "u.uuid NOT IN (SELECT ss.student_id FROM student_subscriptions ss WHERE ss.status IN ('VIP','TRIAL') AND (ss.expired_date IS NULL OR ss.expired_date > NOW()))",
+                null,
+                false
+            );
+        }
+
+        $total   = $builder->countAllResults(false);
+        $users   = $builder->orderBy('u.full_name', 'ASC')
+            ->limit($perPage, ($page - 1) * $perPage)
+            ->get()->getResultObject();
+
+        return $this->success([
+            'users'      => $users,
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total'       => $total,
+                'total_pages' => (int) ceil($total / $perPage),
+            ],
+        ]);
+    }
+
+    /**
      * Chuẩn hoá allowed_grades về JSON string hoặc null.
      * Input có thể là: array [1,2,5], string "1,2,5", string "[1,2,5]", null/empty.
      */
