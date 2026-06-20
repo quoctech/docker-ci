@@ -12,11 +12,13 @@ use Modules\RoleManagement\Repositories\UserPermissionRepository;
  * ModuleCheckFilter - Kiểm tra module có đang bật và user có quyền truy cập không.
  *
  * Flow:
- * 1. Kiểm tra module đang bật (Redis cache qua ModuleModel::isEnabled)
- * 2. Với workspace_admin: kiểm tra quyền CRUD thông qua UserPermissionRepository
+ * 1. Kiểm tra module đang bật (Redis cache qua ModuleModel::isEnabled).
+ * 2. Với user (bất kỳ role nào, kể cả học sinh): kiểm tra quyền CRUD thông qua UserPermissionRepository
  *    (JOIN từ user_applied_roles → role_module_permissions, có cache Redis).
  * 3. Super_admin luôn pass (đã được xử lý ở JWTAuthFilter).
- * 4. User (học sinh) không được truy cập module admin — trả 403.
+ *
+ * Lưu ý: Học sinh (role='user') cũng có thể có permission cho module qua role
+ * được apply → vẫn được truy cập module đó.
  */
 class ModuleCheckFilter implements FilterInterface
 {
@@ -37,16 +39,10 @@ class ModuleCheckFilter implements FilterInterface
             }
         }
 
-        // Bước 2: Phân quyền cho workspace_admin (super_admin đã pass ở JWTAuthFilter)
+        // Bước 2: Phân quyền cho workspace_admin + user (cả học sinh nếu có role permission)
         $authUser = $request->authUser ?? null;
         if (! $authUser || $authUser->role === 'super_admin') {
             return null;
-        }
-
-        if ($authUser->role !== 'workspace_admin') {
-            return service('response')
-                ->setStatusCode(403)
-                ->setJSON(['status' => 'error', 'message' => 'Bạn không có quyền truy cập module này.']);
         }
 
         // Map HTTP method → cột quyền tương ứng
@@ -60,12 +56,14 @@ class ModuleCheckFilter implements FilterInterface
 
         $permRepo = new UserPermissionRepository();
         foreach ($arguments as $slug) {
+            // Bất kỳ user nào (workspace_admin, user) có quyền can_read đều truy cập được
             if (! $permRepo->hasPermission($authUser->sub, $slug)) {
                 return service('response')
                     ->setStatusCode(403)
                     ->setJSON(['status' => 'error', 'message' => 'Bạn không có quyền truy cập module này.']);
             }
 
+            // Với POST/PUT/DELETE, kiểm tra thêm quyền tương ứng
             if ($permissionColumn !== 'can_read'
                 && ! $permRepo->hasGranularPermission($authUser->sub, $slug, $permissionColumn)
             ) {

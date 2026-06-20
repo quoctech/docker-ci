@@ -419,23 +419,23 @@ class AuthController extends ApiController
      * Trả về permissions map của user hiện tại — sử dụng UserPermissionRepository
      * (JOIN user_applied_roles → role_module_permissions, có cache Redis).
      *
-     * - super_admin: trả `{all: true}` (full quyền)
-     * - workspace_admin: trả map slug → {can_read, can_write, can_edit, can_delete}
-     * - user (học sinh): trả permissions rỗng (không dùng module admin)
+     * Áp dụng cho MỌI role (không phân biệt super_admin, workspace_admin, user):
+     * - super_admin: trả `{all: true}` (frontend hiển thị tất cả modules)
+     * - workspace_admin + user: trả map slug → {can_read, can_write, can_edit, can_delete}
+     *   (Frontend dựa vào map này để filter sidebar / Awesome Bar — học sinh có
+     *   permission qua role vẫn thấy modules tương ứng).
      */
     public function myModules(): ResponseInterface
     {
         $auth = $this->getAuthUser();
 
+        // super_admin: trả all=true (frontend tự hiển thị tất cả modules)
         if ($auth->role === 'super_admin') {
             return $this->success(['all' => true, 'permissions' => []]);
         }
 
-        if ($auth->role === 'workspace_admin') {
-            $map = (new UserPermissionRepository())->getPermissionsMap($auth->sub);
-            return $this->success(['all' => false, 'permissions' => $map]);
-        }
-
-        return $this->success(['all' => false, 'permissions' => []]);
+        // workspace_admin + user (học sinh): lấy permission qua role (JOIN)
+        $map = (new UserPermissionRepository())->getPermissionsMap($auth->sub);
+        return $this->success(['all' => false, 'permissions' => $map]);
     }
 }
