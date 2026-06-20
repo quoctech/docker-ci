@@ -138,6 +138,15 @@ a:hover {
 }
 
 .sidebar__nav {
+    scrollbar-width: none;          /* Firefox */
+    -ms-overflow-style: none;       /* IE/Edge cũ */
+    overflow-y: auto;
+}
+.sidebar__nav::-webkit-scrollbar {  /* Chrome/Safari */
+    display: none;
+    width: 0;
+}
+.sidebar__nav
     flex: 1;
     padding: 16px 12px;
     overflow-y: auto;

@@ -10,7 +10,7 @@
 (function() {
     try {
         var u = JSON.parse(localStorage.getItem('user') || 'null');
-        if (u && u.role === 'user') window.location.replace('/admin/my-classrooms');
+        // (Đã bỏ redirect cứng theo role — user có quyền classroom sẽ thấy trang này)
     } catch (e) {}
 })();
 </script>

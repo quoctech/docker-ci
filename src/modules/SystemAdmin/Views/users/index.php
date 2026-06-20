@@ -26,9 +26,9 @@
                    @input.debounce.400ms="loadUsers()">
             <select class="form-input" style="height:36px" x-model="filters.role" @change="loadUsers()">
                 <option value="">Tất cả quyền</option>
-                <option value="super_admin">Super Admin</option>
-                <option value="workspace_admin">Giáo viên</option>
-                <option value="user">Người dùng</option>
+                <?php foreach ($roleFilterOptions as $r): ?>
+                    <option value="<?= esc($r['value']) ?>"><?= esc($r['label']) ?></option>
+                <?php endforeach ?>
             </select>
             <select class="form-input" style="height:36px" x-model="filters.status" @change="loadUsers()">
                 <option value="">Tất cả trạng thái</option>
@@ -84,7 +84,7 @@
                                 </td>
                                 <td data-label="Quyền">
                                     <span class="badge"
-                                          :class="u.role === 'super_admin' ? 'badge--danger' : u.role === 'workspace_admin' ? 'badge--warning' : 'badge--info'"
+                                          :class="u.role === 'super_admin' ? 'badge--danger' : (u.role === 'workspace_admin' || u.role === 'workspace-admin') ? 'badge--warning' : 'badge--info'"
                                           x-text="roleLabel(u.role)"></span>
                                 </td>
                                 <td data-label="Lớp / Tổ chức" class="hide-mobile" style="font-size:12px;color:var(--color-text-muted)">
@@ -176,9 +176,10 @@
                         <div class="form-group">
                             <label>Quyền *</label>
                             <select class="form-input" x-model="form.role">
-                                <option value="user">Học sinh</option>
-                                <option value="workspace_admin">Giáo viên</option>
-                                <option value="super_admin">Super Admin</option>
+                                <option value="">— Chọn vai trò —</option>
+                                <?php foreach ($roleFilterOptions as $r): ?>
+                                    <option value="<?= esc($r['value']) ?>"><?= esc($r['label']) ?></option>
+                                <?php endforeach ?>
                             </select>
                         </div>
                         <div class="form-group" x-show="!editingUser">

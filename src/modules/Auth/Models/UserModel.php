@@ -9,6 +9,11 @@ use CodeIgniter\Model;
  *
  * Xử lý CRUD, tìm kiếm theo email/username, brute force protection,
  * và quản lý trạng thái tài khoản.
+ *
+ * Lưu ý: Từ migration 2026-06-21-000027, bảng KHÔNG còn cột `role`.
+ *   - `is_super_admin` (TINYINT): chỉ 1 user duy nhất được set = 1.
+ *   - Role khác của user được lưu trong bảng `user_applied_roles` (JOIN `roles`).
+ *   - Method `getEffectiveRole()` trả về role dựa trên is_super_admin + user_applied_roles.
  */
 class UserModel extends Model
 {
@@ -22,6 +27,7 @@ class UserModel extends Model
     /**
      * Các field cho phép mass-assignment.
      * Không bao gồm uuid (là PK, set qua beforeInsert hook), timestamps (auto).
+     * KHÔNG còn `role` — role được quản lý qua bảng `roles` + `user_applied_roles`.
      */
     protected $allowedFields = [
         'uuid',                    // UUID v4 — primary key
@@ -31,9 +37,9 @@ class UserModel extends Model
         'password_hash',           // Mật khẩu đã hash (Argon2id)
         'full_name',               // Họ tên đầy đủ hiển thị
         'avatar',                  // Đường dẫn file avatar (relative path)
-        'role',                    // Phân quyền: super_admin | workspace_admin | user
-        'grade',                   // Lớp học (1–9), chỉ dành cho học sinh (role=user)
-        'organization',            // Tổ chức / Trường, dành cho giáo viên (role=workspace_admin)
+        'is_super_admin',          // Cờ super_admin (chỉ 1 user duy nhất)
+        'grade',                   // Lớp học (1–9), dành cho học sinh
+        'organization',            // Tổ chức / Trường, dành cho giáo viên
         'status',                  // Trạng thái: active | locked | pending
         'email_verified_at',       // Thời điểm xác minh email
         'last_login_at',           // Lần đăng nhập gần nhất
@@ -49,7 +55,6 @@ class UserModel extends Model
         'email'     => 'required|valid_email|max_length[254]|is_unique[users.email,id,{id}]',
         'username'  => 'permit_empty|alpha_numeric|min_length[3]|max_length[30]|is_unique[users.username,id,{id}]',
         'full_name' => 'required|max_length[100]',
-        'role'      => 'in_list[super_admin,workspace_admin,user]',
     ];
 
     /**
@@ -75,9 +80,6 @@ class UserModel extends Model
 
     /**
      * Tìm user bằng email (case-insensitive).
-     *
-     * @param string $email Email cần tìm
-     * @return object|null User object hoặc null nếu không tồn tại
      */
     public function findByEmail(string $email): ?object
     {
@@ -86,9 +88,6 @@ class UserModel extends Model
 
     /**
      * Tìm user bằng username (case-insensitive).
-     *
-     * @param string $username Username cần tìm
-     * @return object|null User object hoặc null nếu không tồn tại
      */
     public function findByUsername(string $username): ?object
     {
@@ -98,14 +97,6 @@ class UserModel extends Model
     /**
      * Tìm user bằng email, username, HOẶC số điện thoại.
      * Dùng cho login — user có thể nhập bất kỳ loại identifier nào.
-     *
-     * Logic detect:
-     * - Chứa "@" → email
-     * - Bắt đầu bằng "+" hoặc toàn số (có thể có dấu cách/gạch) → phone
-     * - Còn lại → username
-     *
-     * @param string $identifier Email, username, hoặc số điện thoại
-     * @return object|null User object hoặc null
      */
     public function findByCredentialIdentifier(string $identifier): ?object
     {
@@ -127,15 +118,10 @@ class UserModel extends Model
     }
 
     /**
-     * Tìm user bằng số điện thoại.
-     * So sánh sau khi loại bỏ ký tự khoảng trắng và gạch ngang.
-     *
-     * @param string $phone Số điện thoại cần tìm
-     * @return object|null User object hoặc null nếu không tồn tại
+     * Tìm user bằng số điện thoại (so sánh sau khi bỏ space và dash).
      */
     public function findByPhone(string $phone): ?object
     {
-        // Normalize: bỏ space và dash để so sánh chính xác
         $normalized = preg_replace('/[\s\-]/', '', trim($phone));
 
         return $this->where('phone', $normalized)->first();
@@ -143,9 +129,6 @@ class UserModel extends Model
 
     /**
      * Tìm user active theo UUID (dùng cho JWT sub lookup).
-     *
-     * @param string $uuid User UUID
-     * @return object|null User nếu active, null nếu không tồn tại hoặc bị khóa
      */
     public function findActiveByUuid(string $uuid): ?object
     {
@@ -154,14 +137,71 @@ class UserModel extends Model
                     ->first();
     }
 
+    /**
+     * Lấy effective role của user dựa trên is_super_admin + user_applied_roles.
+     *
+     * - is_super_admin = 1  → 'super_admin' (chỉ 1 user duy nhất)
+     * - Có role trong user_applied_roles → slug của role đầu tiên
+     * - Mặc định → 'user' (fallback nếu chưa được gán role)
+     */
+    public function getEffectiveRole(string $userUuid): string
+    {
+        $user = $this->find($userUuid);
+        if (! $user) {
+            return 'user';
+        }
+
+        // Super_admin: luôn là 'super_admin'
+        if ((int) ($user->is_super_admin ?? 0) === 1) {
+            return 'super_admin';
+        }
+
+        $db = \Config\Database::connect();
+
+        // Lấy TẤT CẢ role của user (active only)
+        $rows = $db->table('user_applied_roles uar')
+            ->select('r.slug', false)
+            ->join('roles r', 'r.id = uar.role_id AND r.is_active = 1', 'inner', false)
+            ->where('uar.user_uuid', $userUuid)
+            ->orderBy('uar.applied_at', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        if (empty($rows)) {
+            return 'user';  // fallback nếu không có role nào
+        }
+
+        // Ưu tiên: super-admin > workspace-admin > user
+        $priority = ['super-admin' => 3, 'workspace-admin' => 2, 'user' => 1];
+        // Trả về format underscore để tương thích với code cũ
+        $slugToValue = ['super-admin' => 'super_admin', 'workspace-admin' => 'workspace_admin', 'user' => 'user'];
+        $bestRole = 'user';
+        $bestPriority = 0;
+        foreach ($rows as $row) {
+            $slug = $row['slug'];
+            $p    = $priority[$slug] ?? 0;
+            if ($p > $bestPriority) {
+                $bestPriority = $p;
+                $bestRole     = $slug;
+            }
+        }
+
+        return $slugToValue[$bestRole] ?? $bestRole;
+    }
+
+    /**
+     * Check user có phải super_admin không.
+     */
+    public function isSuperAdmin(string $userUuid): bool
+    {
+        $user = $this->find($userUuid);
+        return $user && (int) ($user->is_super_admin ?? 0) === 1;
+    }
+
     // =========================================================================
     // LOGIN TRACKING
     // =========================================================================
 
-    /**
-     * Ghi nhận đăng nhập thành công.
-     * Reset bộ đếm failed attempts và cập nhật IP/thời gian.
-     */
     public function recordLogin(string $uuid, string $ip): void
     {
         $this->update($uuid, [
@@ -172,10 +212,6 @@ class UserModel extends Model
         ]);
     }
 
-    /**
-     * Tăng bộ đếm đăng nhập sai.
-     * Nếu >= MAX_LOGIN_ATTEMPTS lần sai liên tiếp, tự động khóa tạm.
-     */
     public function incrementFailedAttempts(string $uuid): int
     {
         $user     = $this->find($uuid);
@@ -192,12 +228,6 @@ class UserModel extends Model
         return $attempts;
     }
 
-    /**
-     * Kiểm tra tài khoản có đang bị khóa tạm không.
-     *
-     * @param object $user User object chứa trường locked_until
-     * @return bool true nếu đang bị khóa
-     */
     public function isLocked(object $user): bool
     {
         if (empty($user->locked_until)) {
@@ -211,15 +241,6 @@ class UserModel extends Model
     // HELPERS
     // =========================================================================
 
-    /**
-     * Tạo UUID v4 (RFC 4122 compliant).
-     *
-     * Sử dụng random_bytes() (CSPRNG) để đảm bảo tính ngẫu nhiên an toàn.
-     * Byte thứ 7: set version = 4 (0100xxxx)
-     * Byte thứ 9: set variant = RFC 4122 (10xxxxxx)
-     *
-     * @return string UUID dạng xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-     */
     private function createUuid(): string
     {
         $data    = random_bytes(16);

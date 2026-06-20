@@ -80,7 +80,7 @@ class AuthController extends ApiController
             'password_hash' => hash_password($input['password'] ?? ''),
             'full_name'     => trim($input['full_name'] ?? ''),
             'phone'         => $rawPhone ? preg_replace('/[\s\-]/', '', trim($rawPhone)) : null,
-            'role'          => ROLE_USER,
+            'is_super_admin'=> 0,  // User mới không phải super_admin
             'status'        => STATUS_ACTIVE,
         ];
 
@@ -98,12 +98,43 @@ class AuthController extends ApiController
 
         $user = $this->userModel->find($userId);
 
+        // Auto-assign default role 'user' (Học sinh) cho user mới nếu role này tồn tại
+        $this->autoAssignDefaultRole($userUuid);
+
         return $this->success([
             'uuid'      => $user->uuid,
             'email'     => $user->email,
             'username'  => $user->username,
             'full_name' => $user->full_name,
+            'role'      => $this->userModel->getEffectiveRole($userUuid),
         ], 'Registration successful.', 201);
+    }
+
+    /**
+     * Tự động gán role mặc định 'user' (slug = 'hoc-sinh') cho user mới.
+     */
+    private function autoAssignDefaultRole(string $userUuid): void
+    {
+        try {
+            $db = \Config\Database::connect();
+            $defaultRole = $db->table('roles')
+                ->where('slug', 'user')
+                ->where('is_active', 1)
+                ->get()
+                ->getRowArray();
+            if (! $defaultRole) {
+                return;  // Không có role 'user' trong DB → bỏ qua
+            }
+            $db->table('user_applied_roles')->insert([
+                'user_uuid'  => $userUuid,
+                'role_id'    => $defaultRole['id'],
+                'applied_by' => $userUuid,  // self-assign
+                'applied_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $e) {
+            // Fail-silent — không chặn flow đăng ký
+            log_message('error', '[Auth] autoAssignDefaultRole failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -175,7 +206,7 @@ class AuthController extends ApiController
         // Sinh JWT access token (ngắn hạn, 15 phút)
         $accessToken = $this->jwt->generateAccessToken([
             'id'   => $user->uuid,   // UUID là sub trong JWT
-            'role' => $user->role,
+            'role' => $this->userModel->getEffectiveRole($user->uuid),
         ]);
 
         // Sinh refresh token (dài hạn, 7 ngày, lưu DB)
@@ -213,7 +244,8 @@ class AuthController extends ApiController
                 'username'   => $user->username,
                 'full_name'  => $user->full_name,
                 'avatar_url' => $user->avatar ? '/uploads/avatars/' . $user->avatar : null,
-                'role'       => $user->role,
+                'role'       => $this->userModel->getEffectiveRole($user->uuid),
+                'is_super_admin' => (int) ($user->is_super_admin ?? 0) === 1,
             ],
         ], 'Login successful.');
     }
@@ -257,7 +289,7 @@ class AuthController extends ApiController
 
         $accessToken = $this->jwt->generateAccessToken([
             'id'   => $user->uuid,
-            'role' => $user->role,
+            'role' => $this->userModel->getEffectiveRole($user->uuid),
         ]);
 
         $newRefresh = $this->jwt->generateRefreshToken();
@@ -367,7 +399,8 @@ class AuthController extends ApiController
             'full_name'  => $user->full_name,
             'avatar_url' => $user->avatar ? '/uploads/avatars/' . $user->avatar : null,
             'phone'      => $user->phone,
-            'role'       => $user->role,
+            'role'       => $this->userModel->getEffectiveRole($user->uuid),
+            'is_super_admin' => (int) ($user->is_super_admin ?? 0) === 1,
             'created_at' => $user->created_at,
         ]);
     }

@@ -6,6 +6,8 @@ use App\Controllers\ApiController;
 use App\Libraries\SystemLogger;
 use CodeIgniter\HTTP\ResponseInterface;
 use Modules\RoleManagement\Repositories\RoleAuditLogRepository;
+use Modules\Auth\Models\UserModel;
+use Modules\Auth\Repositories\UserRepository;
 use Modules\RoleManagement\Repositories\RoleRepository;
 use Modules\RoleManagement\Repositories\UserPermissionRepository;
 
@@ -35,6 +37,7 @@ class AdminRoleController extends ApiController
     private RoleRepository          $repo;
     private UserPermissionRepository $userPermRepo;
     private RoleAuditLogRepository  $auditRepo;
+    private UserModel                $userModel;
 
     /** Module lõi không được cấp quyền qua role (chỉ super_admin mới có). */
     private const NON_GRANTABLE = ['auth', 'system-admin', 'system-log'];
@@ -44,6 +47,7 @@ class AdminRoleController extends ApiController
         $this->repo        = new RoleRepository();
         $this->userPermRepo = new UserPermissionRepository();
         $this->auditRepo   = new RoleAuditLogRepository();
+        $this->userModel   = new UserModel();
     }
 
     /** GET /api/role-management/roles */
@@ -420,7 +424,7 @@ class AdminRoleController extends ApiController
 
         // Kiểm tra user tồn tại (CHẤP NHẬN MỌI ROLE — không filter theo role)
         $user = $db->table('users')
-            ->select('uuid, role, status, full_name')
+            ->select('uuid, status, full_name')
             ->where('uuid', $userUuid)
             ->where('deleted_at', null)
             ->get()
@@ -454,7 +458,7 @@ class AdminRoleController extends ApiController
         SystemLogger::info('Áp dụng vai trò "' . $role->name . '" cho user: ' . $userUuid, [
             'role_uuid' => $uuid,
             'user_uuid' => $userUuid,
-            'user_role' => $user['role'],
+            'user_role' => $this->userModel->getEffectiveRole($userUuid),
             'reapplied' => $alreadyApplied > 0,
         ]);
 
@@ -466,7 +470,7 @@ class AdminRoleController extends ApiController
             performedBy: $auth->sub,
             after: [
                 'user_uuid' => $userUuid,
-                'user_role' => $user['role'],
+                'user_role' => $this->userModel->getEffectiveRole($userUuid),
                 'user_name' => $user['full_name'],
                 'role_name' => $role->name,
             ]

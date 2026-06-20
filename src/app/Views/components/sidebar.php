@@ -5,10 +5,13 @@
  * Khi thêm module mới, chỉ cần insert vào bảng module_sidebar_items
  * trong migration của module đó. Không cần sửa file này.
  *
- * Logic x-show cho item:
- *   allowed_roles chứa "workspace_admin" + "super_admin"  → hasModule(slug)
- *   allowed_roles chứa "workspace_admin" (không có super_admin) → hasModule + exclude super_admin
- *   allowed_roles chứa "user"                              → user.role === 'user'
+ * Logic x-show (đã đơn giản hóa — permission-based):
+ *   Mọi item: user && hasModule(slug)
+ *   Mọi group: user && (hasModule(slug1) || hasModule(slug2) || ...)
+ *
+ * → Áp dụng cho MỌI role (super_admin, workspace_admin, user/học sinh).
+ * → Item chỉ hiện khi user có can_read cho module đó (qua role permission).
+ * → Super_admin (userModules=null) luôn thấy mọi items.
  */
 
 $navGroups = [];
@@ -50,21 +53,13 @@ function sidebarItemXshow(object $item): string
 {
     $roles = $item->roles_arr;
 
-    if (in_array('workspace_admin', $roles) && in_array('super_admin', $roles)) {
-        // hasModule trả true cho super_admin (userModules=null) và workspace_admin có quyền
-        return "user && hasModule('" . esc($item->module_slug, 'attr') . "')";
+    // Item chỉ dành cho role='user' (học sinh): chỉ hiện cho student
+    if (in_array('user', $roles) && ! in_array('super_admin', $roles) && ! in_array('workspace_admin', $roles)) {
+        return "user && user.role === 'user' && hasModule('" . esc($item->module_slug, 'attr') . "')";
     }
 
-    if (in_array('workspace_admin', $roles)) {
-        // super_admin đã có item này ở section khác (vd: "Hệ thống")
-        return "user && user.role !== 'super_admin' && hasModule('" . esc($item->module_slug, 'attr') . "')";
-    }
-
-    if (in_array('user', $roles)) {
-        return "user && user.role === 'user'";
-    }
-
-    return "user && " . json_encode($roles) . ".includes(user.role)";
+    // Item cho admin/workspace_admin/super_admin: check permission (hasModule)
+    return "user && hasModule('" . esc($item->module_slug, 'attr') . "')";
 }
 
 /**
@@ -76,29 +71,16 @@ function sidebarItemXshow(object $item): string
  */
 function sidebarGroupXshow(array $items): string
 {
-    $allRoles    = array_unique(array_merge(...array_map(fn($i) => $i->roles_arr, $items)));
+    // Permission-based: nhóm hiện khi user có can_read cho ÍT NHẤT 1 module trong nhóm.
+    // Áp dụng cho MỌI role (không phân biệt super_admin, workspace_admin, user).
     $moduleSlugs = array_unique(array_map(fn($i) => $i->module_slug, $items));
 
-    // OR của hasModule() cho từng slug trong nhóm
     $hasAnyModule = implode(' || ', array_map(
         fn($s) => "hasModule('" . esc($s, 'attr') . "')",
         $moduleSlugs
     ));
 
-    $conds = [];
-
-    $adminRoles = array_values(array_intersect(['workspace_admin', 'super_admin'], $allRoles));
-    if (! empty($adminRoles)) {
-        $roleConds = implode(' || ', array_map(fn($r) => "user.role === '$r'", $adminRoles));
-        // hasModule() trả true cho super_admin nên điều kiện này đúng cho cả hai role
-        $conds[] = "($roleConds) && ($hasAnyModule)";
-    }
-
-    if (in_array('user', $allRoles)) {
-        $conds[] = "user.role === 'user'";
-    }
-
-    return "user && (" . implode(' || ', $conds ?: ["false"]) . ")";
+    return "user && (" . ($hasAnyModule ?: "false") . ")";
 }
 ?>
 <aside class="sidebar" :class="{ 'sidebar--open': sidebarOpen }">
