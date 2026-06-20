@@ -12,6 +12,7 @@ use Predis\Client;
  * - Session management (revoke all devices)
  * - Rate limiting (chống brute force, spam)
  * - Module status cache (dynamic routing)
+ * - User permission cache (Single Source of Truth qua role)
  *
  * Tất cả methods là static để tiện gọi từ bất kỳ đâu.
  * Connection được tái sử dụng trong suốt 1 request (singleton).
@@ -266,5 +267,69 @@ class RedisService
         }
 
         return $maxRequests - $count;
+    }
+
+    // =========================================================================
+    // USER PERMISSION CACHE (Single Source of Truth qua role)
+    // =========================================================================
+
+    /**
+     * Lấy permissions map của user từ Redis cache.
+     *
+     * Map có dạng: ['slug' => ['can_read' => bool, 'can_write' => bool, ...]]
+     *
+     * @param string $userUuid User UUID
+     * @return array|null null nếu cache miss
+     */
+    public static function getUserPermCache(string $userUuid): ?array
+    {
+        $raw = self::getInstance()->get(REDIS_PREFIX_USER_PERM . $userUuid);
+
+        if ($raw === null) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Lưu permissions map của user vào Redis.
+     *
+     * @param string $userUuid    User UUID
+     * @param array  $permissions Map slug => [can_read, can_write, can_edit, can_delete]
+     * @param int    $ttl         TTL tính bằng giây (mặc định USER_PERM_CACHE_TTL)
+     */
+    public static function setUserPermCache(string $userUuid, array $permissions, int $ttl = USER_PERM_CACHE_TTL): void
+    {
+        self::getInstance()->setex(
+            REDIS_PREFIX_USER_PERM . $userUuid,
+            $ttl,
+            json_encode($permissions, JSON_UNESCAPED_UNICODE)
+        );
+    }
+
+    /**
+     * Xóa cache permission của 1 user (dùng khi role/user thay đổi).
+     */
+    public static function invalidateUserPermCache(string $userUuid): void
+    {
+        self::getInstance()->del(REDIS_PREFIX_USER_PERM . $userUuid);
+    }
+
+    /**
+     * Xóa cache permission của nhiều user cùng lúc (dùng khi role thay đổi).
+     *
+     * @param string[] $userUuids
+     */
+    public static function invalidateUserPermCacheBatch(array $userUuids): void
+    {
+        if (empty($userUuids)) {
+            return;
+        }
+
+        $redis = self::getInstance();
+        $keys  = array_map(fn($uuid) => REDIS_PREFIX_USER_PERM . $uuid, $userUuids);
+        $redis->del($keys);
     }
 }

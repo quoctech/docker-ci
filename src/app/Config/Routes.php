@@ -162,7 +162,7 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
         $routes->get('my-classrooms/(:segment)/assignments', '\Modules\Classroom\Controllers\AssignmentController::index/$1');
         $routes->delete('my-classrooms/(:segment)/leave', '\Modules\Classroom\Controllers\ClassroomMemberController::leave/$1');
 
-        // AwesomeBar Search — mọi role đã đăng nhập đều dùng được, controller tự filter theo role
+        // AwesomeBar Search — workspace_admin phải có quyền awesome-bar, controller tự filter theo role
         $routes->get('admin/search', '\Modules\AwesomeBar\Controllers\AdminAwesomeBarController::search');
 
         // School Management — Center, Branch & Room CRUD
@@ -196,6 +196,11 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
             $routes->get('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::getModules/$1');
             $routes->put('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::setModules/$1');
             $routes->post('roles/(:segment)/apply-to-user',   '\Modules\RoleManagement\Controllers\AdminRoleController::applyToUser/$1');
+
+            // Search users (mọi role — gồm cả học sinh) để áp dụng role
+            $routes->get('users-search',                       '\Modules\RoleManagement\Controllers\AdminRoleController::searchUsers');
+            // Bỏ áp dụng role cho user
+            $routes->delete('user-applied-roles',              '\Modules\RoleManagement\Controllers\AdminRoleController::unapplyRole');
         });
 
         // VortexEngine — Subscription Management (super_admin + workspace_admin with permission)

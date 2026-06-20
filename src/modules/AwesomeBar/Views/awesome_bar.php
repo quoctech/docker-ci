@@ -1,3 +1,4 @@
+<template x-if="hasModule('awesome-bar')">
 <div x-data="awesomeBar()" x-cloak
      @keydown.ctrl.k.window.prevent="toggle()"
      @keydown.meta.k.window.prevent="toggle()"
@@ -58,3 +59,4 @@
         </div>
     </div>
 </div>
+</template>

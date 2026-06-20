@@ -33,10 +33,20 @@ class UserManagementController extends ApiController
         $perPage = min((int) ($this->request->getGet('per_page') ?? 20), 100);
 
         $gradeGet = $this->request->getGet('grade');
+        $search   = $this->request->getGet('search');
+        $role     = $this->request->getGet('role');
+
+        // UX: Nếu admin search theo tên/email/username/phone thì BỎ filter role.
+        // Lý do: khi search "Bùi Quốc Thành", admin muốn tìm ĐÚNG người đó bất kể role.
+        // Nếu chỉ filter role (không search) thì giữ nguyên.
+        if (! empty($search) && ! empty($role)) {
+            $role = null;  // Search takes priority
+        }
+
         $filters  = [
-            'role'               => $this->request->getGet('role'),
+            'role'               => $role,
             'status'             => $this->request->getGet('status'),
-            'search'             => $this->request->getGet('search'),
+            'search'             => $search,
             'grade'              => ($gradeGet !== null && $gradeGet !== '') ? (int) $gradeGet : null,
             'exclude_subscribed' => (bool) $this->request->getGet('exclude_subscribed'),
         ];

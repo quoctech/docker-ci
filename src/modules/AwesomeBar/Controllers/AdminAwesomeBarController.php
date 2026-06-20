@@ -4,12 +4,21 @@ namespace Modules\AwesomeBar\Controllers;
 
 use App\Controllers\ApiController;
 use Modules\AwesomeBar\Repositories\AwesomeBarItemRepository;
+use Modules\RoleManagement\Repositories\UserPermissionRepository;
 
 /**
  * AdminAwesomeBarController
  *
  * API cho tính năng Awesome Bar (CTRL+K).
  * Tìm kiếm đa nguồn: trang admin, người dùng, module, cài đặt.
+ *
+ * Quy tắc truy cập (NO RESTRICTION):
+ *   - BẤT KỲ user nào đã đăng nhập đều có thể dùng Awesome Bar.
+ *   - Kết quả search được filter theo permission của user hiện tại.
+ *
+ *   super_admin: thấy TẤT CẢ items.
+ *   workspace_admin + user (học sinh): chỉ thấy items cho module họ có `can_read`.
+ *   user (học sinh) + BẤT KỲ role nào: luôn thấy lớp học của mình (my classrooms).
  *
  * Convention khi thêm module mới:
  *   Gọi AwesomeBarItemRepository::register() trong migration hoặc
@@ -30,62 +39,86 @@ class AdminAwesomeBarController extends ApiController
      */
     public function search(): \CodeIgniter\HTTP\ResponseInterface
     {
-        $q    = trim($this->request->getGet('q') ?? '');
-        $auth = $this->getAuthUser();
+        $q           = trim($this->request->getGet('q') ?? '');
+        $auth        = $this->getAuthUser();
         $isSuperAdmin = $auth->role === 'super_admin';
         $isStudent    = $auth->role === 'user';
 
-        $enabledSlugs = $this->getEnabledModuleSlugs();
+        // Lấy danh sách slug mà user có quyền can_read.
+        // Super_admin: null = không filter (xem hết).
+        // workspace_admin + user: filter theo permission qua UserPermissionRepository
+        // (JOIN user_applied_roles → role_module_permissions).
+        $userPermittedSlugs = $isSuperAdmin
+            ? null
+            : (new UserPermissionRepository())->getReadableSlugs($auth->sub);
 
-        // Học sinh: chỉ tìm lớp học của mình (nếu module classroom đang bật)
-        if ($isStudent) {
-            $classroomActive = in_array('classroom', $enabledSlugs);
+        // Học sinh: luôn thấy lớp học của mình (kèm theo kết quả filter).
+        $myClassrooms = $isStudent ? $this->searchMyClassrooms($q, $auth->sub) : [];
 
-            if ($q === '') {
-                $pages = $classroomActive
-                    ? array_map(fn($i) => $this->formatItem($i), $this->repo->getActiveForModules(['classroom']))
-                    : [];
-                $myClassrooms = $classroomActive ? $this->searchMyClassrooms('', $auth->sub) : [];
-                return $this->respond([
-                    'status' => 'success',
-                    'data'   => ['pages' => array_merge($pages, $myClassrooms), 'users' => [], 'modules' => [], 'configs' => []],
-                ]);
-            }
-
+        if ($q === '') {
+            $pages = $this->getFilteredPages(null, $userPermittedSlugs);
             return $this->respond([
                 'status' => 'success',
                 'data'   => [
-                    'pages'   => $classroomActive ? $this->searchMyClassrooms($q, $auth->sub) : [],
-                    'users'   => [],
-                    'modules' => [],
-                    'configs' => [],
+                    'pages'      => $pages,
+                    'classrooms' => $myClassrooms,
+                    'users'      => [],
+                    'modules'    => [],
+                    'configs'    => [],
                 ],
-            ]);
-        }
-
-        // workspace_admin: lọc pages theo module được cấp quyền, không trả users/modules/configs
-        if (! $isSuperAdmin) {
-            $permittedSlugs = $this->getPermittedSlugsForUser($auth->sub);
-            $enabledSlugs   = array_intersect($enabledSlugs, $permittedSlugs);
-        }
-
-        if ($q === '') {
-            $pages = array_map(fn($i) => $this->formatItem($i), $this->repo->getActiveForModules($enabledSlugs));
-            return $this->respond([
-                'status' => 'success',
-                'data'   => ['pages' => $pages, 'users' => [], 'modules' => [], 'configs' => []],
             ]);
         }
 
         return $this->respond([
             'status' => 'success',
             'data'   => [
-                'pages'   => $this->searchPages($q, $enabledSlugs),
-                'users'   => $isSuperAdmin ? $this->searchUsers($q)   : [],
-                'modules' => $isSuperAdmin ? $this->searchModules($q) : [],
-                'configs' => $isSuperAdmin ? $this->searchConfigs($q) : [],
+                'pages'      => $this->getFilteredPages($q, $userPermittedSlugs),
+                'classrooms' => $myClassrooms,
+                'users'      => $isSuperAdmin ? $this->searchUsers($q)   : [],
+                'modules'    => $isSuperAdmin ? $this->searchModules($q) : [],
+                'configs'    => $isSuperAdmin ? $this->searchConfigs($q) : [],
             ],
         ]);
+    }
+
+    /**
+     * Lấy + filter awesome_bar_items theo permission của user.
+     *
+     * @param string|null $q                   Query string (null = lấy tất cả)
+     * @param array|null  $userPermittedSlugs  Slug user có quyền can_read. null = super_admin (xem tất cả)
+     * @return array
+     */
+    private function getFilteredPages(?string $q, ?array $userPermittedSlugs): array
+    {
+        $db   = \Config\Database::connect();
+        $builder = $db->table('awesome_bar_items')->where('is_active', 1);
+
+        if ($q !== null && $q !== '') {
+            $builder->groupStart()
+                ->like('LOWER(title)', strtolower($q))
+                ->orLike('keywords', strtolower($q))
+            ->groupEnd();
+        }
+
+        $rows = $builder->orderBy('sort_order', 'ASC')->get(100)->getResult();
+
+        return array_values(array_map(
+            fn($r) => $this->formatItem($r),
+            array_filter($rows, function ($r) use ($userPermittedSlugs) {
+                // Super_admin (userPermittedSlugs === null) thì xem hết.
+                if ($userPermittedSlugs === null) {
+                    return true;
+                }
+
+                // Item có module_slug cụ thể → phải nằm trong permitted slugs.
+                if ($r->module_slug !== null && $r->module_slug !== '') {
+                    return in_array($r->module_slug, $userPermittedSlugs, true);
+                }
+
+                // Item với module_slug = NULL (hoặc rỗng) → KHÔNG hiện cho non-super-admin.
+                return false;
+            })
+        ));
     }
 
     private function searchMyClassrooms(string $q, string $studentUuid): array
@@ -116,50 +149,7 @@ class AdminAwesomeBarController extends ApiController
         ], $rows);
     }
 
-    private function getPermittedSlugsForUser(string $userUuid): array
-    {
-        $db = \Config\Database::connect();
-        return array_column(
-            $db->table('user_module_permissions')
-                ->select('module_slug')
-                ->where('user_uuid', $userUuid)
-                ->where('can_read', 1)
-                ->get()->getResultArray(),
-            'module_slug'
-        );
-    }
-
     // =========================================================================
-
-    private function getEnabledModuleSlugs(): array
-    {
-        $db = \Config\Database::connect();
-        return array_column(
-            $db->table('modules')
-                ->select('slug')
-                ->where('is_enabled', 1)
-                ->get()->getResultArray(),
-            'slug'
-        );
-    }
-
-    private function searchPages(string $q, array $enabledSlugs): array
-    {
-        $db   = \Config\Database::connect();
-        $rows = $db->table('awesome_bar_items')
-            ->where('is_active', 1)
-            ->groupStart()
-                ->like('LOWER(title)', strtolower($q))
-                ->orLike('keywords', strtolower($q))
-            ->groupEnd()
-            ->orderBy('sort_order', 'ASC')
-            ->get(10)->getResult();
-
-        return array_values(array_map(
-            fn($r) => $this->formatItem($r),
-            array_filter($rows, fn($r) => $r->module_slug === null || in_array($r->module_slug, $enabledSlugs))
-        ));
-    }
 
     private function searchUsers(string $q): array
     {

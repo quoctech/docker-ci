@@ -49,20 +49,19 @@ defined('DECADE') || define('DECADE', 315_360_000);
  |
  | Used to indicate the conditions under which the script is exit()ing.
  | While there is no universal standard for error codes, there are some
- | broad conventions.  Three such conventions are mentioned below, for
- | those who wish to make use of them.  The CodeIgniter defaults were
- | chosen for the least overlap with these conventions, while still
- | leaving room for others to be defined in future versions and user
- | applications.
+ | broad conventions and three that are popular within the PHP community.
+ | Three such conventions are mentioned below, for those that wish to make
+ | use of them. The CI4 defaults are chosen for the least overlap with these
+ | conventions, while still leaving room for others to be defined in future
+ | versions and user applications.
  |
- | The three main conventions used for determining exit status codes
- | are as follows:
+ | The three main conventions used for determining exit status codes are:
  |
  |    Standard C/C++ Library (stdlibc):
  |       http://www.gnu.org/software/libc/manual/html_node/Exit-Status.html
- |       (This link also contains other GNU-specific conventions)
- |    BSD sysexits.h:
- |       http://www.gsp.com/cgi-bin/man.cgi?section=3&topic=sysexits
+ |       (This link also includes information on other GNU-specific conventions)
+ |    BSD sysexits.h
+ |       https://man.openbsd.org/sysexits
  |    Bash scripting:
  |       http://tldp.org/LDP/abs/html/exitcodes.html
  |
@@ -121,6 +120,11 @@ defined('REDIS_PREFIX_LOGIN')      || define('REDIS_PREFIX_LOGIN', 'login:attemp
 defined('REDIS_PREFIX_RATE')       || define('REDIS_PREFIX_RATE', 'rate:');
 defined('REDIS_KEY_MODULES')      || define('REDIS_KEY_MODULES', 'modules:status');
 defined('REDIS_KEY_SITE_CONFIG')  || define('REDIS_KEY_SITE_CONFIG', 'site:config');
+
+// --- User Permission Cache (Single Source of Truth qua role) ---
+defined('REDIS_PREFIX_USER_PERM')  || define('REDIS_PREFIX_USER_PERM', 'perm:user:');
+defined('REDIS_PREFIX_ROLE_USERS') || define('REDIS_PREFIX_ROLE_USERS', 'role:users:');
+defined('USER_PERM_CACHE_TTL')     || define('USER_PERM_CACHE_TTL', 3600); // 1 giờ
 
 // --- VortexEngine: Subscription Engine ---
 defined('SUB_STATUS_TRIAL')   || define('SUB_STATUS_TRIAL', 'TRIAL');

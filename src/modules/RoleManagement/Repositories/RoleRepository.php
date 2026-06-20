@@ -4,6 +4,19 @@ namespace Modules\RoleManagement\Repositories;
 
 use Modules\RoleManagement\Models\RoleModel;
 
+/**
+ * RoleRepository - Thao tác với bảng roles + role_module_permissions.
+ *
+ * Liên kết với UserPermissionRepository (JOIN user_applied_roles → role_module_permissions)
+ * để lấy quyền thực tế của user — không copy dữ liệu.
+ *
+ * Soft-delete + tạo lại: tận dụng row cũ thay vì tạo row mới.
+ *   - Tạo role: nếu slug đã tồn tại với is_active=0 → REVIVE row đó (set is_active=1, update tên)
+ *   - Nếu slug đã tồn tại với is_active=1 → báo lỗi trùng
+ *   - Nếu slug chưa tồn tại → INSERT mới
+ *
+ * Cách này KHÔNG cần virtual column / partial unique index → đơn giản hơn nhiều.
+ */
 class RoleRepository
 {
     private RoleModel $model;
@@ -27,7 +40,7 @@ class RoleRepository
     public function list(): array
     {
         return $this->db->table('roles r')
-            ->select('r.id, r.uuid, r.name, r.slug, r.description, r.is_active, r.created_at,
+            ->select('r.id, r.uuid, r.name, r.slug, r.description, r.is_active, r.perm_version, r.created_at,
                       (SELECT COUNT(*) FROM role_module_permissions rmp WHERE rmp.role_id = r.id AND rmp.can_read = 1) AS module_count', false)
             ->where('r.is_active', 1)
             ->orderBy('r.name', 'ASC')
@@ -45,17 +58,71 @@ class RoleRepository
         return $this->model->where('slug', $slug)->where('is_active', 1)->first();
     }
 
-    public function create(array $data): ?object
+    /**
+     * Tìm role theo slug, kể cả soft-deleted.
+     * Dùng để kiểm tra khi tạo role: nếu đã có row inactive → revive thay vì tạo mới.
+     */
+    public function findBySlugAny(string $slug): ?object
     {
+        return $this->model->where('slug', $slug)->first();
+    }
+
+    /**
+     * Tạo role MỚI hoặc REVIVE role đã soft-delete (cùng slug).
+     *
+     * Logic:
+     *   - Nếu có row inactive với slug này → REVIVE (set is_active=1, cập nhật name, description, bump perm_version)
+     *   - Nếu có row active với slug này → throw exception (slug trùng)
+     *   - Nếu chưa có → INSERT mới
+     *
+     * Cách này giải quyết bug "Duplicate entry 'giao-vien' for key 'slug'" mà KHÔNG
+     * cần virtual column / partial unique index ở DB.
+     *
+     * @return array{role: object, revived: bool}
+     * @throws \RuntimeException khi slug đang được dùng bởi role active
+     */
+    public function createOrRevive(array $data): array
+    {
+        $slug = $data['slug'] ?? '';
+        $existing = $slug ? $this->findBySlugAny($slug) : null;
+
+        if ($existing && (int) $existing->is_active === 1) {
+            throw new \RuntimeException("Slug '{$slug}' đã được sử dụng bởi vai trò đang hoạt động.");
+        }
+
+        if ($existing) {
+            // REVIVE row cũ (giữ uuid để không phá reference trong role_module_permissions,
+            // user_applied_roles, audit log...)
+            $this->model->update($existing->id, [
+                'name'        => $data['name'],
+                'description' => $data['description'] ?? null,
+                'is_active'   => 1,
+                'perm_version' => 1,
+            ]);
+            return [
+                'role'    => $this->model->find($existing->id),
+                'revived' => true,
+            ];
+        }
+
+        // Tạo mới
         $id = $this->model->insert([
             'uuid'        => $this->generateUuid(),
             'name'        => $data['name'],
             'slug'        => $data['slug'],
             'description' => $data['description'] ?? null,
             'is_active'   => 1,
+            'perm_version' => 1,
         ]);
 
-        return $id ? $this->model->find($id) : null;
+        if (! $id) {
+            throw new \RuntimeException('Không thể tạo vai trò.');
+        }
+
+        return [
+            'role'    => $this->model->find($id),
+            'revived' => false,
+        ];
     }
 
     public function update(int $id, array $data): void
@@ -63,6 +130,10 @@ class RoleRepository
         $this->model->update($id, $data);
     }
 
+    /**
+     * Soft-delete role: chỉ set is_active=0.
+     * Slug không đổi — khi tạo lại sẽ được revive (xem createOrRevive()).
+     */
     public function deactivate(int $id): void
     {
         $this->model->update($id, ['is_active' => 0]);
@@ -89,7 +160,12 @@ class RoleRepository
         );
     }
 
-    public function setPermissions(int $roleId, array $permissions): void
+    /**
+     * Ghi permission mới cho role. Bump perm_version.
+     *
+     * Trả về danh sách user_uuid bị ảnh hưởng để controller xóa cache.
+     */
+    public function setPermissions(int $roleId, array $permissions): array
     {
         $this->db->transStart();
 
@@ -99,7 +175,9 @@ class RoleRepository
 
         foreach ($permissions as $perm) {
             $slug = $perm['slug'] ?? '';
-            if (! $slug || empty($perm['can_read'])) continue;
+            if (! $slug || empty($perm['can_read'])) {
+                continue;
+            }
 
             $this->db->table('role_module_permissions')->insert([
                 'role_id'     => $roleId,
@@ -111,10 +189,27 @@ class RoleRepository
             ]);
         }
 
+        // Bump perm_version
+        $this->db->table('roles')
+            ->where('id', $roleId)
+            ->increment('perm_version');
+
         $this->db->transComplete();
 
         if ($this->db->transStatus() === false) {
             throw new \RuntimeException('Lưu phân quyền vai trò thất bại. Vui lòng thử lại.');
         }
+
+        return $this->getUsersWithRole($roleId);
+    }
+
+    /**
+     * Bump perm_version cho role (không thay đổi permission thực tế).
+     */
+    public function bumpPermVersion(int $roleId): void
+    {
+        $this->db->table('roles')
+            ->where('id', $roleId)
+            ->increment('perm_version');
     }
 }

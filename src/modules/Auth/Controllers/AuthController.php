@@ -8,8 +8,7 @@ use App\Libraries\RedisService;
 use CodeIgniter\HTTP\ResponseInterface;
 use Modules\Auth\Models\UserModel;
 use Modules\Auth\Models\RefreshTokenModel;
-use Modules\SystemAdmin\Models\ModuleModel;
-use Modules\SystemAdmin\Repositories\UserModulePermissionRepository;
+use Modules\RoleManagement\Repositories\UserPermissionRepository;
 
 /**
  * AuthController - Xử lý xác thực người dùng.
@@ -225,7 +224,7 @@ class AuthController extends ApiController
      * POST /api/auth/refresh
      *
      * Refresh token lấy từ HttpOnly cookie (tự gửi bởi browser).
-     * Áp dụng token rotation: revoke token cũ, cấp token mới.
+     * Áp dụng token rotation: revoke token cũ, cấp mới.
      * Nếu refresh token bị reuse (đã revoke) → có thể bị đánh cắp → hệ thống phát hiện.
      *
      * @return ResponseInterface 200 + access_token mới
@@ -414,7 +413,16 @@ class AuthController extends ApiController
         return $this->success(null, 'Password changed. Please login again.');
     }
 
-    /** GET /api/auth/my-modules — permissions map của user hiện tại */
+    /**
+     * GET /api/auth/my-modules
+     *
+     * Trả về permissions map của user hiện tại — sử dụng UserPermissionRepository
+     * (JOIN user_applied_roles → role_module_permissions, có cache Redis).
+     *
+     * - super_admin: trả `{all: true}` (full quyền)
+     * - workspace_admin: trả map slug → {can_read, can_write, can_edit, can_delete}
+     * - user (học sinh): trả permissions rỗng (không dùng module admin)
+     */
     public function myModules(): ResponseInterface
     {
         $auth = $this->getAuthUser();
@@ -424,7 +432,7 @@ class AuthController extends ApiController
         }
 
         if ($auth->role === 'workspace_admin') {
-            $map = (new UserModulePermissionRepository())->getPermissionsMap($auth->sub);
+            $map = (new UserPermissionRepository())->getPermissionsMap($auth->sub);
             return $this->success(['all' => false, 'permissions' => $map]);
         }
 
