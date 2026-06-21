@@ -7,7 +7,7 @@
 <?= $this->section('content') ?>
 
 <div x-data="roleManager()" x-init="load()"
-     x-on:keydown.escape.window="showModal = false; showModulesModal = false; showApplyModal = false">
+     x-on:keydown.escape.window="showModal = false; showModulesModal = false; showApplyModal = false; showUsersModal = false">
 
     <div class="page-header">
         <div>
@@ -56,6 +56,7 @@
                                     <button class="btn btn--ghost btn--sm" @click="openEdit(r)" title="Sửa">✏</button>
                                     <button class="btn btn--ghost btn--sm" @click="openModulesModal(r)" title="Phân quyền module">🔐</button>
                                     <button class="btn btn--ghost btn--sm" @click="openApplyModal(r)" title="Áp dụng cho người dùng">👤</button>
+                                    <button class="btn btn--ghost btn--sm" @click="openUsersModal(r)" title="Danh sách người dùng đang được gán vai trò này">👥</button>
                                     <button class="btn btn--ghost btn--sm"
                                             @click="confirmDelete(r)"
                                             :disabled="r.is_protected"
@@ -208,10 +209,93 @@
         </div>
     </div>
 
+    <!-- ===== MODAL: Danh sách người dùng đang được gán vai trò ===== -->
+    <div x-show="showUsersModal" x-cloak class="modal-overlay" @click.self="showUsersModal = false">
+        <div class="modal-box" style="max-width:680px;max-height:85vh;display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div>
+                    <h3 style="margin:0">Người dùng có vai trò</h3>
+                    <div style="font-size:12px;color:var(--color-text-muted);margin-top:2px">
+                        Vai trò: <strong x-text="usersRole?.name"></strong>
+                        <span x-show="usersList.length > 0">
+                            · <span x-text="usersList.length + ' người'"></span>
+                        </span>
+                    </div>
+                </div>
+                <button class="btn btn--ghost btn--sm" @click="showUsersModal = false">✕</button>
+            </div>
+
+            <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 12px 0">
+                Danh sách người dùng đang được gán vai trò này. Có thể gỡ bỏ vai trò khỏi từng người dùng.
+            </p>
+
+            <div x-show="loadingUsers" style="text-align:center;padding:24px;color:var(--color-text-muted)">Đang tải...</div>
+
+            <div x-show="!loadingUsers && usersList.length === 0"
+                 style="text-align:center;padding:32px;color:var(--color-text-muted);font-size:14px">
+                Chưa có người dùng nào được gán vai trò này.
+            </div>
+
+            <div x-show="!loadingUsers && usersList.length > 0"
+                 style="flex:1;overflow-y:auto;border:1px solid var(--color-border);border-radius:8px">
+                <table class="table" style="font-size:13px;margin:0">
+                    <thead style="position:sticky;top:0;background:var(--color-surface);z-index:1">
+                        <tr>
+                            <th>Người dùng</th>
+                            <th style="width:90px">Trạng thái</th>
+                            <th style="width:80px">Phân quyền lúc</th>
+                            <th style="width:100px;text-align:right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="u in usersList" :key="u.uuid">
+                            <tr>
+                                <td>
+                                    <div style="font-weight:500" x-text="u.full_name"></div>
+                                    <div style="font-size:11px;color:var(--color-text-muted)">
+                                        <span x-text="u.email"></span>
+                                        <span x-show="u.username"> · @<span x-text="u.username"></span></span>
+                                        <span x-show="u.is_super_admin" class="badge badge--danger" style="font-size:10px;margin-left:4px">Super Admin</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge"
+                                          :class="u.status === 'active' ? 'badge--success' : 'badge--secondary'"
+                                          x-text="u.status === 'active' ? 'Hoạt động' : u.status"></span>
+                                </td>
+                                <td style="font-size:11px;color:var(--color-text-muted)" x-text="u.applied_at"></td>
+                                <td style="text-align:right">
+                                    <button class="btn btn--ghost btn--sm"
+                                            @click="confirmUnapplyRole(u)"
+                                            :disabled="removingUserUuid === u.uuid"
+                                            title="Gỡ bỏ vai trò này khỏi người dùng"
+                                            style="color:var(--color-danger)">
+                                        <span x-show="removingUserUuid !== u.uuid">✕ Gỡ</span>
+                                        <span x-show="removingUserUuid === u.uuid">...</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn btn--secondary btn--sm" @click="showUsersModal = false">Đóng</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <?= $this->section('scripts') ?>
-<script src="/assets/modules/RoleManagement/role-management.js"></script>
+<?php
+    // Cache-busting: chỉ refresh file JS khi thực sự thay đổi (dùng filemtime).
+    // Tránh browser serve file cũ khi ta vừa thêm method mới (như openUsersModal).
+    $rmJsFile = __DIR__ . '/../../../../public/assets/modules/RoleManagement/role-management.js';
+    $rmJsVer  = is_file($rmJsFile) ? filemtime($rmJsFile) : time();
+?>
+<script src="/assets/modules/RoleManagement/role-management.js?v=<?= $rmJsVer ?>"></script>
 <?= $this->endSection() ?>
 
 <?= $this->endSection() ?>

@@ -618,9 +618,39 @@ class AdminRoleController extends ApiController
     {
         $auth = $this->getAuthUser();
 
-        $body = $this->request->getJSON(true) ?? [];
-        $userUuid = trim((string) ($body['user_uuid'] ?? $this->request->getPost('user_uuid') ?? ''));
-        $roleUuid = trim((string) ($body['role_uuid'] ?? $this->request->getPost('role_uuid') ?? ''));
+        // Hỗ trợ CẢ 3 dạng body:
+        //   1. form-urlencoded (qua getBody() + parse_str — hoạt động với cả method DELETE/PUT)
+        //   2. JSON (qua getJSON — nhưng throw nếu body không phải JSON)
+        //   3. POST vars (chỉ hoạt động với POST method, fallback)
+        //
+        // Lý do dùng getBody() trước: vì DELETE request KHÔNG parse form-urlencoded
+        // tự động như POST, getPost() trả về rỗng.
+        $userUuid = '';
+        $roleUuid = '';
+
+        $rawBody = $this->request->getBody() ?? '';
+        if (! empty($rawBody) && str_contains($this->request->getHeaderLine('Content-Type'), 'application/x-www-form-urlencoded')) {
+            parse_str($rawBody, $parsed);
+            $userUuid = trim((string) ($parsed['user_uuid'] ?? ''));
+            $roleUuid = trim((string) ($parsed['role_uuid'] ?? ''));
+        }
+
+        // Fallback: thử POST (cho method POST)
+        if ($userUuid === '' || $roleUuid === '') {
+            $userUuid = $userUuid !== '' ? $userUuid : trim((string) ($this->request->getPost('user_uuid') ?? ''));
+            $roleUuid = $roleUuid !== '' ? $roleUuid : trim((string) ($this->request->getPost('role_uuid') ?? ''));
+        }
+
+        // Fallback: thử JSON
+        if ($userUuid === '' || $roleUuid === '') {
+            try {
+                $body      = $this->request->getJSON(true) ?? [];
+                $userUuid  = $userUuid !== '' ? $userUuid : trim((string) ($body['user_uuid'] ?? ''));
+                $roleUuid  = $roleUuid !== '' ? $roleUuid : trim((string) ($body['role_uuid'] ?? ''));
+            } catch (\Throwable $e) {
+                // body không phải JSON hợp lệ — bỏ qua
+            }
+        }
 
         if (! $userUuid || ! $roleUuid) {
             return $this->error('Thiếu user_uuid hoặc role_uuid.', 422);

@@ -24,6 +24,12 @@ function roleManager() {
         userResults: [],
         searchingUsers: false,
 
+        showUsersModal: false,
+        usersRole: null,
+        usersList: [],
+        loadingUsers: false,
+        removingUserUuid: null,
+
         async load() {
             this.loading = true;
             const data = await apiGet('/api/role-management/roles');
@@ -213,6 +219,67 @@ function roleManager() {
                 this.showApplyModal = false;
             } else {
                 showToast('error', data?.message || 'Có lỗi xảy ra.');
+            }
+        },
+
+        // ============================================================
+        // Danh sách người dùng có vai trò
+        // ============================================================
+
+        async openUsersModal(r) {
+            this.usersRole      = r;
+            this.usersList      = [];
+            this.showUsersModal = true;
+            this.loadingUsers   = true;
+
+            try {
+                const data = await apiGet('/api/role-management/roles/' + r.uuid + '/users');
+                if (data?.status === 'success') {
+                    this.usersList = data.data.users || [];
+                } else {
+                    showToast('error', data?.message || 'Không thể tải danh sách người dùng.');
+                }
+            } catch (e) {
+                showToast('error', 'Không thể kết nối API.');
+            } finally {
+                this.loadingUsers = false;
+            }
+        },
+
+        async confirmUnapplyRole(user) {
+            // Bảo vệ: không cho gỡ role 'user' khỏi super admin (vì super admin cần role này)
+            if (user.is_super_admin && this.usersRole?.slug === 'user') {
+                showToast('error', 'Không thể gỡ vai trò "user" khỏi tài khoản Super Admin.');
+                return;
+            }
+
+            const ok = await showConfirm({
+                title:       'Gỡ bỏ vai trò',
+                message:     `Gỡ bỏ vai trò "${this.usersRole?.name}" khỏi người dùng "${user.full_name || user.email}"?\n\nNgười dùng sẽ mất các quyền tương ứng ở request kế tiếp.`,
+                type:        'warning',
+                confirmText: 'Gỡ bỏ',
+            });
+            if (!ok) return;
+
+            this.removingUserUuid = user.uuid;
+            try {
+                const data = await apiRequest('/api/role-management/user-applied-roles', {
+                    method:  'DELETE',
+                    body:    new URLSearchParams({ user_uuid: user.uuid, role_uuid: this.usersRole.uuid }),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                });
+
+                if (data?.status === 'success') {
+                    showToast('success', data.message || 'Đã gỡ bỏ vai trò.');
+                    // Xóa user khỏi list local
+                    this.usersList = this.usersList.filter(x => x.uuid !== user.uuid);
+                } else {
+                    showToast('error', data?.message || 'Có lỗi xảy ra.');
+                }
+            } catch (e) {
+                showToast('error', 'Không thể kết nối API.');
+            } finally {
+                this.removingUserUuid = null;
             }
         },
     };
