@@ -55,6 +55,13 @@ function sidebarItemXshow(object $item): string
 
     // Item chỉ dành cho role='user' (học sinh): chỉ hiện cho student
     if (in_array('user', $roles) && ! in_array('super_admin', $roles) && ! in_array('workspace_admin', $roles)) {
+        // Ngoại lệ: item "Danh sách lớp học" (URL /admin/my-classrooms)
+        // → ẨN khi student ĐÃ CÓ quyền trên module classroom (sẽ thấy qua module trực tiếp,
+        //   không cần shortcut "Danh sách lớp học của tôi" nữa).
+        // → HIỆN khi student CHƯA có quyền gì trên module (cần shortcut này để xem lớp).
+        if ($item->url === '/admin/my-classrooms') {
+            return "user && user.role === 'user' && !hasModule('" . esc($item->module_slug, 'attr') . "')";
+        }
         return "user && user.role === 'user' && hasModule('" . esc($item->module_slug, 'attr') . "')";
     }
 
@@ -68,11 +75,13 @@ function sidebarItemXshow(object $item): string
  * Với workspace_admin/super_admin: group chỉ hiện khi hasModule() trả true cho ít nhất 1 slug trong nhóm.
  * hasModule() trả true cho super_admin (userModules=null) nên super_admin luôn thấy.
  * workspace_admin chỉ thấy khi được cấp can_read cho ít nhất 1 module trong nhóm.
+ *
+ * Ngoại lệ cho student-only item: nếu trong nhóm có 1 item chỉ dành cho student (my-classrooms)
+ * thì nhóm cũng hiện cho student — vì item đó dùng logic ngược (!hasModule) nên có thể hiện
+ * ngay cả khi student chưa có quyền module.
  */
 function sidebarGroupXshow(array $items): string
 {
-    // Permission-based: nhóm hiện khi user có can_read cho ÍT NHẤT 1 module trong nhóm.
-    // Áp dụng cho MỌI role (không phân biệt super_admin, workspace_admin, user).
     $moduleSlugs = array_unique(array_map(fn($i) => $i->module_slug, $items));
 
     $hasAnyModule = implode(' || ', array_map(
@@ -80,7 +89,29 @@ function sidebarGroupXshow(array $items): string
         $moduleSlugs
     ));
 
-    return "user && (" . ($hasAnyModule ?: "false") . ")";
+    // Detect có student-only item không
+    $hasStudentItem = false;
+    foreach ($items as $i) {
+        $r = $i->roles_arr;
+        if (in_array('user', $r) && ! in_array('super_admin', $r) && ! in_array('workspace_admin', $r)) {
+            $hasStudentItem = true;
+            break;
+        }
+    }
+
+    $conditions = [];
+    if ($hasAnyModule) {
+        $conditions[] = $hasAnyModule;
+    }
+    if ($hasStudentItem) {
+        $conditions[] = "user.role === 'user'";
+    }
+
+    if (empty($conditions)) {
+        return "user && false";
+    }
+
+    return "user && (" . implode(' || ', $conditions) . ")";
 }
 ?>
 <aside class="sidebar" :class="{ 'sidebar--open': sidebarOpen }">

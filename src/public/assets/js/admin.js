@@ -160,9 +160,19 @@ function adminApp() {
             }
         },
 
-        // Trả true nếu user có quyền đọc module (sidebar hiện, Ctrl+K tìm được)
+        // Trả true nếu user có BẤT KỲ quyền nào trên module (can_read | can_write | can_edit | can_delete).
+        // Dùng để quyết định: sidebar item có hiện không, Ctrl+K có tìm kiếm item đó không.
+        //
+        // Lý do KHÔNG chỉ check can_read:
+        //   Nếu user chỉ được cấp can_write/can_edit/can_delete mà KHÔNG có can_read
+        //   (VD: data cũ hoặc admin set nhầm), họ vẫn CẦN thấy sidebar item để vào module —
+        //   nếu không sẽ bị "khóa ngoài cửa" dù có quyền bên trong.
+        //   Logic backend ở controller vẫn enforce can_read riêng (qua @permission filter) khi cần.
         hasModule(slug) {
-            return this.userModules === null || (this.userModules[slug]?.can_read ?? false);
+            if (this.userModules === null) return true;
+            const m = this.userModules[slug];
+            if (!m) return false;
+            return m.can_read || m.can_write || m.can_edit || m.can_delete;
         },
 
         // Trả true nếu user có quyền cụ thể: can_read | can_write | can_edit | can_delete
