@@ -269,9 +269,10 @@ class AdminSubscriptionController extends ApiController
         $excludeSubscribed = (bool) $this->request->getGet('exclude_subscribed');
 
         $db      = \Config\Database::connect();
+        // Lấy tất cả user active (cột users.role đã drop, không filter được).
+        // Admin có thể filter thêm ở frontend nếu cần.
         $builder = $db->table('users u')
             ->select('u.uuid, u.full_name, u.email, u.username, u.grade', false)
-            ->where('u.role', 'user')
             ->where('u.status', 'active');
 
         if (!empty($search)) {

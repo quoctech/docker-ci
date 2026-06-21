@@ -42,6 +42,13 @@ class AdminRoleController extends ApiController
     /** Module lõi không được cấp quyền qua role (chỉ super_admin mới có). */
     private const NON_GRANTABLE = ['auth', 'system-admin', 'system-log'];
 
+    /**
+     * Slug role hệ thống KHÔNG được xóa để đảm bảo hệ thống luôn có role nền tảng.
+     * - super-admin: quản trị cao nhất, không thể thiếu
+     * - user:       role mặc định cho user mới (xem logic AuthController::register)
+     */
+    private const PROTECTED_SLUGS = ['super-admin', 'user'];
+
     public function __construct()
     {
         $this->repo        = new RoleRepository();
@@ -53,7 +60,12 @@ class AdminRoleController extends ApiController
     /** GET /api/role-management/roles */
     public function index(): ResponseInterface
     {
-        return $this->success($this->repo->list());
+        $roles = array_map(function ($r) {
+            $r->is_protected = in_array($r->slug, self::PROTECTED_SLUGS, true);
+            return $r;
+        }, $this->repo->list());
+
+        return $this->success($roles);
     }
 
     /**
@@ -157,31 +169,145 @@ class AdminRoleController extends ApiController
     /**
      * DELETE /api/role-management/roles/:uuid
      *
-     * Chỉ set is_active=0. Slug giữ nguyên → có thể tạo lại (sẽ revive row cũ).
+     * Quy trình xóa role (theo yêu cầu nghiệp vụ):
+     *   1. Tìm role theo UUID (404 nếu không có)
+     *   2. Bảo vệ role hệ thống (PROTECTED_SLUGS) — không cho xóa super-admin/user
+     *   3. Tìm tất cả user đang được gán role này
+     *   4. Gỡ bỏ tất cả user_applied_roles của role này (xóa record)
+     *   5. Invalidate cache permission của những user bị gỡ
+     *   6. Soft-delete role (set is_active=0)
+     *   7. Ghi audit log cho cả 2 hành động: gỡ role khỏi user + xóa role
+     *
+     * Lý do gỡ user trước:
+     *   - Đảm bảo không còn user nào đang "treo" trên role đã xóa
+     *   - Permission của user bị thu hồi ngay (qua JOIN is_active=1)
+     *   - Tránh trường hợp role được revive sau này khiến user nhận lại role cũ
      */
     public function delete(string $uuid): ResponseInterface
+    {
+        $auth = $this->getAuthUser();
+        $role = $this->repo->findByUuid($uuid);
+        if (! $role) {
+            return $this->error('Không tìm thấy vai trò.', 404);
+        }
+
+        // Bảo vệ role hệ thống — không cho xóa slug nằm trong PROTECTED_SLUGS
+        if (in_array($role->slug, self::PROTECTED_SLUGS, true)) {
+            return $this->error(
+                'Không thể xóa vai trò hệ thống "' . $role->name . '". Vai trò này cần thiết cho hoạt động của hệ thống.',
+                403
+            );
+        }
+
+        // Bước 1: Gỡ bỏ tất cả user đang được gán role này
+        $affectedUsers = $this->repo->removeAllUsersFromRole($role->id);
+
+        // Bước 2: Invalidate cache permission cho các user bị gỡ
+        if (! empty($affectedUsers)) {
+            $this->userPermRepo->invalidateCacheBatch($affectedUsers);
+
+            // Ghi audit log riêng cho hành động gỡ role khỏi user
+            foreach ($affectedUsers as $userUuid) {
+                $this->auditRepo->log(
+                    action: 'role_unapplied_by_role_delete',
+                    roleUuid: $uuid,
+                    roleId: $role->id,
+                    userUuid: $userUuid,
+                    performedBy: $auth->sub,
+                    before: [
+                        'user_uuid' => $userUuid,
+                        'role_name' => $role->name,
+                        'reason'    => 'role_deleted',
+                    ]
+                );
+            }
+        }
+
+        // Bước 3: Soft-delete role (set is_active=0)
+        $this->repo->deactivate($role->id);
+
+        SystemLogger::info('Xóa vai trò: ' . $role->name, [
+            'role_uuid'           => $uuid,
+            'affected_user_count' => count($affectedUsers),
+        ]);
+        $this->auditRepo->log(
+            action: 'role_deleted',
+            roleUuid: $uuid,
+            roleId: $role->id,
+            performedBy: $auth->sub,
+            before: ['name' => $role->name, 'slug' => $role->slug],
+            after: [
+                'is_active'           => 0,
+                'affected_user_count' => count($affectedUsers),
+            ]
+        );
+
+        $msg = count($affectedUsers) > 0
+            ? 'Đã xóa vai trò và gỡ bỏ vai trò khỏi ' . count($affectedUsers) . ' người dùng.'
+            : 'Đã xóa vai trò.';
+
+        return $this->success(
+            ['affected_user_count' => count($affectedUsers)],
+            $msg
+        );
+    }
+
+    /**
+     * GET /api/role-management/roles/:uuid/users
+     *
+     * Lấy danh sách user đang được gán role này.
+     * Dùng để hiển thị cảnh báo trước khi xóa role.
+     *
+     * Query params:
+     *   - page:     trang (default 1)
+     *   - per_page: số record/trang (default 20, max 100)
+     */
+    public function getUsersAssigned(string $uuid): ResponseInterface
     {
         $role = $this->repo->findByUuid($uuid);
         if (! $role) {
             return $this->error('Không tìm thấy vai trò.', 404);
         }
 
-        $affectedUsers = $this->repo->getUsersWithRole($role->id);
-        $this->userPermRepo->invalidateCacheBatch($affectedUsers);
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = min(100, max(1, (int) ($this->request->getGet('per_page') ?? 20)));
 
-        $this->repo->deactivate($role->id);
+        $db = \App\Libraries\Db::connection();
 
-        SystemLogger::info('Xóa vai trò: ' . $role->name, ['role_uuid' => $uuid]);
-        $this->auditRepo->log(
-            action: 'role_deleted',
-            roleUuid: $uuid,
-            roleId: $role->id,
-            performedBy: $this->getAuthUser()->sub,
-            before: ['name' => $role->name, 'slug' => $role->slug],
-            after: ['is_active' => 0]
-        );
+        // Đếm tổng — KHÔNG phụ thuộc pagination để hiển thị count chính xác cho warning
+        $total = $db->table('user_applied_roles uar')
+            ->join('users u', 'u.uuid = uar.user_uuid AND u.deleted_at IS NULL', 'inner', false)
+            ->where('uar.role_id', $role->id)
+            ->countAllResults();
 
-        return $this->success(null, 'Đã xóa vai trò.');
+        $users = $db->table('user_applied_roles uar')
+            ->select('u.uuid, u.full_name, u.email, u.username, u.status, u.is_super_admin, uar.applied_at, uar.applied_by', false)
+            ->join('users u', 'u.uuid = uar.user_uuid AND u.deleted_at IS NULL', 'inner', false)
+            ->where('uar.role_id', $role->id)
+            ->orderBy('uar.applied_at', 'DESC')
+            ->limit($perPage, ($page - 1) * $perPage)
+            ->get()
+            ->getResultArray();
+
+        return $this->success([
+            'count'        => $total,
+            'is_protected' => in_array($role->slug, self::PROTECTED_SLUGS, true),
+            'users'        => array_map(fn($u) => [
+                'uuid'           => $u['uuid'],
+                'full_name'      => $u['full_name'],
+                'email'          => $u['email'],
+                'username'       => $u['username'],
+                'status'         => $u['status'],
+                'is_super_admin' => (int) ($u['is_super_admin'] ?? 0),
+                'applied_at'     => $u['applied_at'],
+            ], $users),
+            'pagination' => [
+                'page'        => $page,
+                'per_page'    => $perPage,
+                'total'       => $total,
+                'total_pages' => (int) ceil($total / $perPage),
+            ],
+        ]);
     }
 
     /** GET /api/role-management/roles/:uuid/modules */
@@ -327,13 +453,14 @@ class AdminRoleController extends ApiController
 
         $db = \App\Libraries\Db::connection();
         $builder = $db->table('users')
-            ->select('uuid, username, full_name, email, phone, role, status, grade, organization, created_at', false);
+            ->select('uuid, username, full_name, email, phone, status, grade, organization, created_at', false);
         // KHÔNG filter deleted_at — searchUsers dùng cho cả admin thao tác
 
-        // Filter theo role (optional) — KHÔNG ép buộc phải truyền
-        if ($role !== '') {
-            $builder->where('role', $role);
-        }
+        // Filter theo role (optional) — KHÔNG dùng được vì cột users.role đã drop.
+        // Role sẽ được filter ở controller hoặc hiển thị qua formatUser().
+        // if ($role !== '') {
+        //     $builder->where('role', $role);
+        // }
 
         // Filter theo status (optional) — KHÔNG default status='active' để search thấy cả học sinh pending/locked
         $status = $this->request->getGet('status');
@@ -364,12 +491,6 @@ class AdminRoleController extends ApiController
                          ->limit($perPage, ($page - 1) * $perPage)
                          ->get()
                          ->getResultArray();
-
-        // DEBUG: log query SQL để debug nếu vẫn không tìm thấy user
-        log_message('debug', '[searchUsers] search=' . var_export($search, true)
-            . ' role=' . var_export($role, true)
-            . ' status=' . var_export($status ?? null, true)
-            . ' total=' . $total);
 
         return $this->success([
             'users' => array_map(fn($u) => [

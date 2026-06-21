@@ -56,7 +56,11 @@
                                     <button class="btn btn--ghost btn--sm" @click="openEdit(r)" title="Sửa">✏</button>
                                     <button class="btn btn--ghost btn--sm" @click="openModulesModal(r)" title="Phân quyền module">🔐</button>
                                     <button class="btn btn--ghost btn--sm" @click="openApplyModal(r)" title="Áp dụng cho người dùng">👤</button>
-                                    <button class="btn btn--ghost btn--sm" @click="confirmDelete(r)" title="Xóa">✕</button>
+                                    <button class="btn btn--ghost btn--sm"
+                                            @click="confirmDelete(r)"
+                                            :disabled="r.is_protected"
+                                            :title="r.is_protected ? 'Không thể xóa vai trò hệ thống' : 'Xóa'"
+                                            :style="r.is_protected ? 'opacity:0.4;cursor:not-allowed' : ''">✕</button>
                                 </div>
                             </td>
                         </tr>

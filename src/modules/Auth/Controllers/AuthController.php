@@ -6,6 +6,7 @@ use App\Controllers\ApiController;
 use App\Libraries\JWTManager;
 use App\Libraries\RedisService;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Libraries\Db;
 use Modules\Auth\Models\UserModel;
 use Modules\Auth\Models\RefreshTokenModel;
 use Modules\RoleManagement\Repositories\UserPermissionRepository;
@@ -116,7 +117,7 @@ class AuthController extends ApiController
     private function autoAssignDefaultRole(string $userUuid): void
     {
         try {
-            $db = \Config\Database::connect();
+            $db = \App\Libraries\Db::connection();
             $defaultRole = $db->table('roles')
                 ->where('slug', 'user')
                 ->where('is_active', 1)

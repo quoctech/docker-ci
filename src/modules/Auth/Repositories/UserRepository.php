@@ -108,9 +108,12 @@ class UserRepository
         $builder = $this->model->builder();
         $builder->where('deleted_at', null);
 
-        if (! empty($filters['role'])) {
-            $builder->where('role', $filters['role']);
-        }
+        // Filter role: KHÔNG dùng được nữa vì cột users.role đã bị drop.
+        // Role của user giờ derive từ is_super_admin + user_applied_roles.
+        // Filter sẽ được xử lý ở controller (nếu cần) qua JOIN user_applied_roles.
+        // if (! empty($filters['role'])) {
+        //     $builder->where('role', $filters['role']);
+        // }
 
         if (! empty($filters['status'])) {
             $builder->where('status', $filters['status']);

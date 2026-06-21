@@ -3,6 +3,7 @@
 namespace Modules\SystemAdmin\Controllers;
 
 use App\Controllers\ApiController;
+use App\Libraries\Db;
 use Modules\RoleManagement\Repositories\UserPermissionRepository;
 use CodeIgniter\HTTP\ResponseInterface;
 use Modules\Auth\Models\UserModel;
@@ -241,7 +242,7 @@ class UserManagementController extends ApiController
         ];
         $slug = $slugMap[$newRole];
 
-        $db = \Config\Database::connect();
+        $db = \App\Libraries\Db::connection();
         $role = $db->table('roles')->where('slug', $slug)->get()->getRowArray();
         if (! $role) {
             return $this->error('Role "' . $slug . '" chưa tồn tại trong hệ thống. Hãy seed roles trước.', 500);
@@ -329,7 +330,7 @@ class UserManagementController extends ApiController
     private function autoAssignDefaultRole(string $userUuid): void
     {
         try {
-            $db = \Config\Database::connect();
+            $db = \App\Libraries\Db::connection();
             $defaultRole = $db->table('roles')
                 ->where('slug', 'user')
                 ->where('is_active', 1)

@@ -161,6 +161,52 @@ class RoleRepository
     }
 
     /**
+     * Đếm số user đang được gán role này.
+     * Dùng để hiển thị cảnh báo trước khi xóa role.
+     */
+    public function countUsersWithRole(int $roleId): int
+    {
+        return $this->db->table('user_applied_roles')
+            ->where('role_id', $roleId)
+            ->countAllResults();
+    }
+
+    /**
+     * Gỡ bỏ (xóa) tất cả user_applied_roles có role_id này.
+     * Gọi trước khi xóa role để đảm bảo không còn user nào được gán role.
+     *
+     * Dùng transaction để đảm bảo: nếu delete fail, getUsersWithRole list vẫn đúng
+     * với trạng thái DB (không trả về users đã bị xóa nhưng DB chưa commit).
+     *
+     * Trả về danh sách user_uuid đã bị gỡ để controller invalidate cache.
+     *
+     * @return string[]
+     */
+    public function removeAllUsersFromRole(int $roleId): array
+    {
+        // Lấy danh sách TRƯỚC khi vào transaction — query đọc luôn thấy data mới nhất
+        $affectedUsers = $this->getUsersWithRole($roleId);
+
+        if (empty($affectedUsers)) {
+            return [];
+        }
+
+        $this->db->transStart();
+
+        $this->db->table('user_applied_roles')
+            ->where('role_id', $roleId)
+            ->delete();
+
+        $this->db->transComplete();
+
+        if ($this->db->transStatus() === false) {
+            throw new \RuntimeException('Không thể gỡ người dùng khỏi vai trò. Vui lòng thử lại.');
+        }
+
+        return $affectedUsers;
+    }
+
+    /**
      * Ghi permission mới cho role. Bump perm_version.
      *
      * Trả về danh sách user_uuid bị ảnh hưởng để controller xóa cache.

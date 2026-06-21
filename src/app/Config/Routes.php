@@ -196,9 +196,11 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
             $routes->get('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::getModules/$1');
             $routes->put('roles/(:segment)/modules',           '\Modules\RoleManagement\Controllers\AdminRoleController::setModules/$1');
             $routes->post('roles/(:segment)/apply-to-user',   '\Modules\RoleManagement\Controllers\AdminRoleController::applyToUser/$1');
+            $routes->get('roles/(:segment)/users',             '\Modules\RoleManagement\Controllers\AdminRoleController::getUsersAssigned/$1');
 
             // Search users (mọi role — gồm cả học sinh) để áp dụng role
             $routes->get('users-search',                       '\Modules\RoleManagement\Controllers\AdminRoleController::searchUsers');
+
             // Bỏ áp dụng role cho user
             $routes->delete('user-applied-roles',              '\Modules\RoleManagement\Controllers\AdminRoleController::unapplyRole');
         });

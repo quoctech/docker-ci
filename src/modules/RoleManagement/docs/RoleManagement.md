@@ -164,6 +164,35 @@ public function createOrRevive(array $data): array
 
 **KHÔNG force logout user** khi permission thay đổi — JWT vẫn còn hiệu lực, chỉ cần DEL cache là request kế tiếp sẽ tự lấy permission mới qua JOIN.
 
+## Quy trình xóa vai trò (DELETE /roles/:uuid)
+
+> **Quan trọng**: Khi xóa role, hệ thống **TỰ ĐỘNG** gỡ bỏ role khỏi tất cả user đang được gán trước.
+
+Quy trình thực hiện trong `AdminRoleController::delete()`:
+
+1. Tìm role theo UUID (404 nếu không có hoặc đã bị soft-delete)
+2. `RoleRepository::removeAllUsersFromRole()` → xóa tất cả record trong `user_applied_roles` có `role_id` này
+3. Invalidate cache permission (`perm:user:{uuid}`) của tất cả user bị gỡ
+4. `RoleRepository::deactivate()` → set `roles.is_active = 0`
+5. Ghi audit log:
+   - `role_unapplied_by_role_delete` (1 record cho mỗi user bị gỡ)
+   - `role_deleted` (1 record tổng kết với `affected_user_count`)
+
+Response mẫu:
+
+```json
+{
+  "status": "success",
+  "message": "Đã xóa vai trò và gỡ bỏ vai trò khỏi 3 người dùng.",
+  "data": { "affected_user_count": 3 }
+}
+```
+
+**Lý do gỡ user trước**:
+- Tránh để user "treo" trên role đã xóa (permission = UNION qua JOIN với `is_active=1` nên đã tự mất, nhưng record `user_applied_roles` vẫn còn)
+- Nếu role được revive sau, user sẽ không tự động nhận lại role cũ — đảm bảo admin phải chủ động apply lại
+- Audit log đầy đủ để truy vết ai đã bị gỡ khỏi role nào
+
 ## API Endpoints
 
 Tất cả yêu cầu JWT + filter `module_check:role-management`.
@@ -172,12 +201,14 @@ Tất cả yêu cầu JWT + filter `module_check:role-management`.
 |--------|-----|-------|
 | GET | /api/role-management/roles | Danh sách vai trò |
 | POST | /api/role-management/roles | Tạo mới hoặc revive role soft-deleted (cùng slug) |
-| GET | /api/role-management/roles/:uuid | Chi tiết |
+| GET | /api/role-management/roles/:uuid | Chi tiết role + permissions |
 | PUT | /api/role-management/roles/:uuid | Cập nhật tên/mô tả |
-| DELETE | /api/role-management/roles/:uuid | Soft delete (set is_active=0) |
+| DELETE | /api/role-management/roles/:uuid | **Xóa role + tự động gỡ khỏi user** |
+| GET | /api/role-management/roles/:uuid/users | Danh sách user đang được gán role |
 | GET | /api/role-management/roles/:uuid/modules | Quyền module của vai trò |
 | PUT | /api/role-management/roles/:uuid/modules | Cập nhật quyền module (bump version + DEL cache) |
 | POST | /api/role-management/roles/:uuid/apply-to-user | Áp dụng cho user (multi-role OK) |
+| DELETE | /api/role-management/user-applied-roles | Bỏ áp dụng role cho 1 user (giữ role) |
 
 ## Ghi chú kỹ thuật
 
@@ -189,3 +220,27 @@ Tất cả yêu cầu JWT + filter `module_check:role-management`.
 - Mọi thay đổi đều ghi audit log với before/after JSON để truy vết
 - Check quyền runtime: JOIN `user_applied_roles` → `roles` (is_active=1) → `role_module_permissions`
 - Cache qua Redis: `perm:user:{uuid}` — fallback về DB khi cache miss
+
+## Lịch sử sửa lỗi
+
+### 2026-06-21 — Fix UUID rỗng + Catch-all route gây hiểu nhầm
+
+**Triệu chứng**: Khi bấm xóa role "Super Admin", nhận thông báo `Thiếu UUID vai trò. Cú pháp: DELETE /api/role-management/roles/{uuid}`.
+
+**Nguyên nhân gốc** (gồm 2 phần):
+
+1. **UUID rỗng trong DB**: Role "Super Admin" (id=22) trong bảng `roles` có cột `uuid = ''` — do dữ liệu cũ hoặc bug khi insert. Khi API `GET /roles` trả về `uuid: ""`, frontend build URL thành `/api/role-management/roles/` (UUID rỗng).
+
+2. **Catch-all route gây hiểu nhầm**: Trong `Routes.php` có 2 closure routes `delete('roles')` và `put('roles')` trả về message "Thiếu UUID vai trò" — match đúng với URL có UUID rỗng → hiển thị thông báo kỹ thuật gây hoang mang.
+
+**Cách sửa**:
+
+1. **Migration `2026-06-21-000030_FixEmptyRoleUuids`**: Quét và sinh lại UUID v4 cho mọi row có `uuid=''` hoặc NULL trong bảng `roles`. Idempotent.
+
+2. **Bỏ catch-all routes** trong `app/Config/Routes.php`: Khi UUID rỗng, giờ trả về 404 chuẩn của CodeIgniter thay vì 400 với message gây hiểu nhầm.
+
+3. **Sửa `AdminRoleController::delete()`**: Trước khi soft-delete role, **gỡ bỏ tất cả user_applied_roles** của role đó. Ghi audit log riêng cho hành động gỡ user.
+
+4. **Thêm endpoint `GET /api/role-management/roles/:uuid/users`**: Hiển thị danh sách user đang được gán role (dùng cho cảnh báo trước khi xóa).
+
+5. **Cải thiện UX trong `role-management.js`**: Modal confirm xóa sẽ gọi API trên trước, hiển thị số user sẽ bị ảnh hưởng và tên 3 user đầu tiên để admin xác nhận.

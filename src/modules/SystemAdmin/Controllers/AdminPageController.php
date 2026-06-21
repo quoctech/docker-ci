@@ -30,7 +30,7 @@ class AdminPageController extends BaseController
     public function users(): string
     {
         // Lấy roles active từ DB
-        $db = \Config\Database::connect();
+        $db = \App\Libraries\Db::connection();
         $roles = $db->table('roles')
             ->select('id, uuid, name, slug, description')
             ->where('is_active', 1)
