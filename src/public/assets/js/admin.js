@@ -157,6 +157,10 @@ function adminApp() {
             const data = await apiGet('/api/auth/my-modules');
             if (data?.status === 'success') {
                 this.userModules = data.data.all ? null : (data.data.permissions || {});
+                // Expose ra global scope để các Alpine component khác (VD: school-management.js)
+                // có thể đọc permission mà không cần gọi lại API.
+                // Tránh null khỏi global — set {} để các component check dễ hơn.
+                window.userModules = this.userModules || {};
             }
         },
 

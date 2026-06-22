@@ -1,368 +1,268 @@
 // ==========================================================================
-// SchoolManagement — Center Manager (centers/index.php)
+// SchoolManagement — Quản lý Năm học / Học kỳ (Academic Year)
+// Alpine.js component — phân quyền đọc/ghi/sửa/xóa theo module permission.
 // ==========================================================================
 
-function centerManager() {
+function academicYearManager() {
     return {
-        centers: [],
-        loading: false,
-        showModal: false,
-        submitting: false,
-        editingId: null,
-        form: { name: '', address: '', phone: '', email: '' },
-
-        async load() {
-            this.loading = true;
-            const data = await apiGet('/api/school-management/centers');
-            if (data?.status === 'success') this.centers = data.data;
-            this.loading = false;
-        },
-
-        openCreate() {
-            this.editingId = null;
-            this.form = { name: '', address: '', phone: '', email: '' };
-            this.showModal = true;
-        },
-
-        openEdit(c) {
-            this.editingId = c.uuid;
-            this.form = { name: c.name, address: c.address || '', phone: c.phone || '', email: c.email || '' };
-            this.showModal = true;
-        },
-
-        async submitForm() {
-            if (!this.form.name.trim()) { showToast('error', 'Vui lòng nhập tên trung tâm.'); return; }
-            this.submitting = true;
-
-            const body   = new URLSearchParams(this.form);
-            const url    = this.editingId ? '/api/school-management/centers/' + this.editingId : '/api/school-management/centers';
-            const method = this.editingId ? 'PUT' : 'POST';
-
-            const data = await apiRequest(url, { method, body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            this.submitting = false;
-
-            if (data?.status === 'success') {
-                showToast('success', this.editingId ? 'Cập nhật thành công!' : 'Tạo trung tâm thành công!');
-                this.showModal = false;
-                await this.load();
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        async confirmDelete(c) {
-            const ok = await showConfirm({
-                title:       'Xóa trung tâm',
-                message:     `Xóa trung tâm "${c.name}"? Hành động này không thể hoàn tác.`,
-                type:        'danger',
-                confirmText: 'Xóa',
-            });
-            if (!ok) return;
-            const data = await apiRequest('/api/school-management/centers/' + c.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                showToast('success', 'Đã xóa trung tâm.');
-                this.centers = this.centers.filter(x => x.uuid !== c.uuid);
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-    };
-}
-
-// ==========================================================================
-// SchoolManagement — Branch Manager (branches/index.php)
-// ==========================================================================
-
-function branchManager() {
-    return {
+        // ===== State =====
+        years: [],
         branches: [],
-        centers: [],
-        loading: false,
+        filteredYears: [],
+        loading: true,
+        saving: false,
+        initialLoading: true,
+
+        // Filter
+        searchQuery: '',
+        filterBranchUuid: '',
+
+        // Modal
         showModal: false,
-        submitting: false,
-        editingId: null,
-        form: { center_uuid: '', name: '', address: '', phone: '', email: '', manager: '' },
+        editingUuid: null,
+        form: { name: '', branch_uuid: '', start_date: '', end_date: '' },
+        dateError: '',
+
+        // Dropdown
+        openDropdown: null,
+
+        // Permission (set bằng my-modules API khi init)
+        canRead: false,
+        canWrite: false,
+        canEdit: false,
+        canDelete: false,
+
+        // ============================================================
+        // Lifecycle
+        // ============================================================
 
         async load() {
-            this.loading = true;
-            const [bData, cData] = await Promise.all([
-                apiGet('/api/school-management/branches'),
-                apiGet('/api/school-management/centers'),
-            ]);
-            if (bData?.status === 'success') this.branches = bData.data;
-            if (cData?.status === 'success') this.centers  = cData.data;
-            this.loading = false;
+            // Đọc permission từ userModules đã load ở adminApp.init()
+            this.loadPermissions();
+            if (! this.canRead) {
+                this.loading = false;
+                this.initialLoading = false;
+                return;
+            }
+            await Promise.all([this.loadYears(), this.loadBranches()]);
+            this.initialLoading = false;
+            this.applyFilter();
         },
+
+        loadPermissions() {
+            const m = (typeof userModules !== 'undefined' && userModules) ? userModules : null;
+            if (m === null) {
+                // super_admin: full quyền
+                this.canRead = this.canWrite = this.canEdit = this.canDelete = true;
+                return;
+            }
+            const p = m['school-management'];
+            if (! p) {
+                this.canRead = this.canWrite = this.canEdit = this.canDelete = false;
+                return;
+            }
+            this.canRead   = !!(p.can_read   || p.can_write || p.can_edit || p.can_delete);
+            this.canWrite  = !!(p.can_write  || p.can_edit  || p.can_delete);
+            this.canEdit   = !!(p.can_edit   || p.can_delete);
+            this.canDelete = !!p.can_delete;
+        },
+
+        async loadYears() {
+            this.loading = true;
+            try {
+                const data = await apiGet('/api/school-management/academic-years');
+                if (data?.status === 'success') {
+                    this.years = data.data || [];
+                }
+            } catch (e) {
+                showToast('error', 'Không thể tải danh sách năm học.');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async loadBranches() {
+            try {
+                const data = await apiGet('/api/school-management/branches');
+                if (data?.status === 'success') {
+                    this.branches = data.data || [];
+                }
+            } catch (e) {
+                showToast('error', 'Không thể tải danh sách chi nhánh.');
+            }
+        },
+
+        // ============================================================
+        // Filter
+        // ============================================================
+
+        applyFilter() {
+            const q    = this.searchQuery.toLowerCase().trim();
+            const b    = this.filterBranchUuid;
+            this.filteredYears = this.years.filter(y => {
+                if (q && ! (y.name || '').toLowerCase().includes(q)) return false;
+                if (b && y.branch_uuid !== b) return false;
+                return true;
+            });
+        },
+
+        // ============================================================
+        // Helpers
+        // ============================================================
+
+        formatDate(s) {
+            if (! s) return '—';
+            // YYYY-MM-DD → DD/MM/YYYY
+            const [y, m, d] = s.split('-');
+            return `${d}/${m}/${y}`;
+        },
+
+        durationText(y) {
+            if (! y.start_date || ! y.end_date) return '';
+            const start = new Date(y.start_date);
+            const end   = new Date(y.end_date);
+            const days  = Math.round((end - start) / (1000 * 60 * 60 * 24));
+            if (days < 30) return `${days} ngày`;
+            const months = Math.round(days / 30);
+            if (months < 12) return `${months} tháng`;
+            return `${(days / 365).toFixed(1)} năm`;
+        },
+
+        // ============================================================
+        // Dropdown
+        // ============================================================
+
+        toggleDropdown(uuid) {
+            this.openDropdown = this.openDropdown === uuid ? null : uuid;
+        },
+
+        closeAllDropdowns() {
+            this.openDropdown = null;
+        },
+
+        closeAllModals() {
+            this.showModal = false;
+        },
+
+        // ============================================================
+        // Tạo / Sửa
+        // ============================================================
 
         openCreate() {
-            this.editingId = null;
-            this.form = { center_uuid: '', name: '', address: '', phone: '', email: '', manager: '' };
+            if (! this.canWrite) {
+                showToast('error', 'Bạn không có quyền tạo năm học.');
+                return;
+            }
+            this.editingUuid = null;
+            const today = new Date().toISOString().split('T')[0];
+            this.form = { name: '', branch_uuid: '', start_date: today, end_date: '' };
+            this.dateError = '';
             this.showModal = true;
         },
 
-        openEdit(b) {
-            this.editingId = b.uuid;
+        openEdit(y) {
+            if (! this.canEdit) {
+                showToast('error', 'Bạn không có quyền sửa năm học.');
+                return;
+            }
+            this.editingUuid = y.uuid;
             this.form = {
-                center_uuid: b.center_uuid || '',
-                name:        b.name,
-                address:     b.address || '',
-                phone:       b.phone   || '',
-                email:       b.email   || '',
-                manager:     b.manager || '',
+                name: y.name,
+                branch_uuid: y.branch_uuid,
+                start_date: y.start_date,
+                end_date: y.end_date,
             };
+            this.dateError = '';
             this.showModal = true;
         },
 
-        async submitForm() {
-            if (!this.form.name.trim())    { showToast('error', 'Vui lòng nhập tên chi nhánh.'); return; }
-            if (!this.form.address.trim()) { showToast('error', 'Vui lòng nhập địa chỉ.'); return; }
-            if (!this.form.manager.trim()) { showToast('error', 'Vui lòng nhập người phụ trách.'); return; }
-            if (!this.form.phone.trim())   { showToast('error', 'Vui lòng nhập số điện thoại.'); return; }
-            if (!this.form.email.trim())   { showToast('error', 'Vui lòng nhập email.'); return; }
-            this.submitting = true;
+        validateDates() {
+            this.dateError = '';
+            if (! this.form.start_date || ! this.form.end_date) {
+                this.dateError = 'Vui lòng chọn đầy đủ ngày bắt đầu và kết thúc.';
+                return false;
+            }
+            if (this.form.end_date <= this.form.start_date) {
+                this.dateError = 'Ngày kết thúc phải sau ngày bắt đầu.';
+                return false;
+            }
+            return true;
+        },
 
-            const body   = new URLSearchParams(this.form);
-            const url    = this.editingId ? '/api/school-management/branches/' + this.editingId : '/api/school-management/branches';
-            const method = this.editingId ? 'PUT' : 'POST';
+        async save() {
+            if (! this.form.name.trim()) {
+                showToast('error', 'Vui lòng nhập tên năm học.');
+                return;
+            }
+            if (! this.form.branch_uuid) {
+                showToast('error', 'Vui lòng chọn chi nhánh.');
+                return;
+            }
+            if (! this.validateDates()) {
+                return;
+            }
 
-            const data = await apiRequest(url, { method, body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            this.submitting = false;
+            this.saving = true;
+            try {
+                let data;
+                if (this.editingUuid) {
+                    data = await apiRequest('/api/school-management/academic-years/' + this.editingUuid, {
+                        method:  'PUT',
+                        body:    JSON.stringify(this.form),
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                } else {
+                    data = await apiRequest('/api/school-management/academic-years', {
+                        method:  'POST',
+                        body:    new URLSearchParams(this.form),
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    });
+                }
 
-            if (data?.status === 'success') {
-                showToast('success', this.editingId ? 'Cập nhật thành công!' : 'Tạo chi nhánh thành công!');
-                this.showModal = false;
-                await this.load();
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
+                if (data?.status === 'success') {
+                    showToast('success', this.editingUuid ? 'Cập nhật năm học thành công!' : 'Tạo năm học thành công!');
+                    this.showModal = false;
+                    await this.loadYears();
+                    this.applyFilter();
+                } else {
+                    showToast('error', data?.message || 'Có lỗi xảy ra.');
+                }
+            } catch (e) {
+                showToast('error', 'Không thể kết nối API.');
+            } finally {
+                this.saving = false;
             }
         },
 
-        async confirmDelete(b) {
+        // ============================================================
+        // Xóa
+        // ============================================================
+
+        async confirmDelete(y) {
+            if (! this.canDelete) {
+                showToast('error', 'Bạn không có quyền xóa năm học.');
+                return;
+            }
+
             const ok = await showConfirm({
-                title:       'Xóa chi nhánh',
-                message:     `Xóa chi nhánh "${b.name}"? Hành động này không thể hoàn tác.`,
-                type:        'danger',
+                title: 'Xóa năm học',
+                message: `Xóa năm học "${y.name}" (${this.formatDate(y.start_date)} → ${this.formatDate(y.end_date)})?\n\nHành động này có thể ảnh hưởng đến lịch học, thời khóa biểu và kết quả học tập.`,
+                type: 'danger',
                 confirmText: 'Xóa',
             });
-            if (!ok) return;
-            const data = await apiRequest('/api/school-management/branches/' + b.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                showToast('success', 'Đã xóa chi nhánh.');
-                this.branches = this.branches.filter(x => x.uuid !== b.uuid);
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
+            if (! ok) return;
 
-        viewDetail(b) {
-            window.location.href = '/admin/school-management/branches/' + b.uuid;
-        },
-    };
-}
-
-// ==========================================================================
-// SchoolManagement — Branch Detail (branches/detail.php)
-// ==========================================================================
-
-function branchDetail(uuid) {
-    return {
-        uuid,
-        branch: null,
-        rooms: [],
-        loading: false,
-
-        showEditBranch: false,
-        submittingBranch: false,
-        branchForm: { name: '', address: '', phone: '', email: '', manager: '' },
-
-        showRoomModal: false,
-        submittingRoom: false,
-        editingRoomId: null,
-        roomForm: { name: '', capacity: '', room_type: '' },
-
-        async init() {
-            this.loading = true;
-            const [bData, rData] = await Promise.all([
-                apiGet('/api/school-management/branches/' + uuid),
-                apiGet('/api/school-management/rooms?branch_uuid=' + uuid),
-            ]);
-            if (bData?.status === 'success') this.branch = bData.data;
-            if (rData?.status === 'success') this.rooms  = rData.data;
-            this.loading = false;
-        },
-
-        openEditBranch() {
-            this.branchForm = {
-                name:    this.branch.name    || '',
-                address: this.branch.address || '',
-                phone:   this.branch.phone   || '',
-                email:   this.branch.email   || '',
-                manager: this.branch.manager || '',
-            };
-            this.showEditBranch = true;
-        },
-
-        async submitBranch() {
-            if (!this.branchForm.name.trim())    { showToast('error', 'Vui lòng nhập tên chi nhánh.'); return; }
-            if (!this.branchForm.address.trim()) { showToast('error', 'Vui lòng nhập địa chỉ.'); return; }
-            if (!this.branchForm.manager.trim()) { showToast('error', 'Vui lòng nhập người phụ trách.'); return; }
-            if (!this.branchForm.phone.trim())   { showToast('error', 'Vui lòng nhập số điện thoại.'); return; }
-            if (!this.branchForm.email.trim())   { showToast('error', 'Vui lòng nhập email.'); return; }
-            this.submittingBranch = true;
-
-            const body = new URLSearchParams(this.branchForm);
-            const data = await apiRequest('/api/school-management/branches/' + uuid, {
-                method: 'PUT', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            });
-            this.submittingBranch = false;
-
-            if (data?.status === 'success') {
-                showToast('success', 'Cập nhật chi nhánh thành công!');
-                this.branch = data.data;
-                this.showEditBranch = false;
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        openCreateRoom() {
-            this.editingRoomId = null;
-            this.roomForm = { name: '', capacity: '', room_type: '' };
-            this.showRoomModal = true;
-        },
-
-        openEditRoom(r) {
-            this.editingRoomId = r.uuid;
-            this.roomForm = { name: r.name, capacity: r.capacity || '', room_type: r.room_type || '' };
-            this.showRoomModal = true;
-        },
-
-        async submitRoom() {
-            if (!this.roomForm.name.trim()) { showToast('error', 'Vui lòng nhập tên phòng.'); return; }
-            this.submittingRoom = true;
-
-            const payload = { ...this.roomForm, branch_uuid: uuid };
-            const body    = new URLSearchParams(payload);
-            const url     = this.editingRoomId
-                ? '/api/school-management/rooms/' + this.editingRoomId
-                : '/api/school-management/rooms';
-            const method  = this.editingRoomId ? 'PUT' : 'POST';
-
-            const data = await apiRequest(url, { method, body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            this.submittingRoom = false;
-
-            if (data?.status === 'success') {
-                showToast('success', this.editingRoomId ? 'Cập nhật phòng thành công!' : 'Thêm phòng thành công!');
-                this.showRoomModal = false;
-                const rData = await apiGet('/api/school-management/rooms?branch_uuid=' + uuid);
-                if (rData?.status === 'success') this.rooms = rData.data;
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        async confirmDeleteRoom(r) {
-            const ok = await showConfirm({
-                title:       'Xóa phòng',
-                message:     `Xóa phòng "${r.name}"?`,
-                type:        'danger',
-                confirmText: 'Xóa',
-            });
-            if (!ok) return;
-            const data = await apiRequest('/api/school-management/rooms/' + r.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                showToast('success', 'Đã xóa phòng.');
-                this.rooms = this.rooms.filter(x => x.uuid !== r.uuid);
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-    };
-}
-
-// ==========================================================================
-// SchoolManagement — Room Manager (rooms/index.php)
-// ==========================================================================
-
-function roomManager() {
-    return {
-        rooms: [],
-        branches: [],
-        loading: false,
-        filterBranch: '',
-        showModal: false,
-        submitting: false,
-        editingId: null,
-        form: { name: '', branch_uuid: '', capacity: '', room_type: '' },
-
-        get filteredRooms() {
-            if (!this.filterBranch) return this.rooms;
-            return this.rooms.filter(r => r.branch_uuid === this.filterBranch);
-        },
-
-        async load() {
-            this.loading = true;
-            const [rData, bData] = await Promise.all([
-                apiGet('/api/school-management/rooms'),
-                apiGet('/api/school-management/branches'),
-            ]);
-            if (rData?.status === 'success') this.rooms    = rData.data;
-            if (bData?.status === 'success') this.branches = bData.data;
-            this.loading = false;
-        },
-
-        openCreate() {
-            this.editingId = null;
-            this.form = { name: '', branch_uuid: this.filterBranch || '', capacity: '', room_type: '' };
-            this.showModal = true;
-        },
-
-        openEdit(r) {
-            this.editingId = r.uuid;
-            this.form = {
-                name:        r.name,
-                branch_uuid: r.branch_uuid || '',
-                capacity:    r.capacity    || '',
-                room_type:   r.room_type   || '',
-            };
-            this.showModal = true;
-        },
-
-        async submitForm() {
-            if (!this.form.name.trim())   { showToast('error', 'Vui lòng nhập tên phòng.'); return; }
-            if (!this.form.branch_uuid)   { showToast('error', 'Vui lòng chọn chi nhánh.'); return; }
-            this.submitting = true;
-
-            const body   = new URLSearchParams(this.form);
-            const url    = this.editingId ? '/api/school-management/rooms/' + this.editingId : '/api/school-management/rooms';
-            const method = this.editingId ? 'PUT' : 'POST';
-
-            const data = await apiRequest(url, { method, body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            this.submitting = false;
-
-            if (data?.status === 'success') {
-                showToast('success', this.editingId ? 'Cập nhật thành công!' : 'Thêm phòng thành công!');
-                this.showModal = false;
-                await this.load();
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
-            }
-        },
-
-        async confirmDelete(r) {
-            const ok = await showConfirm({
-                title:       'Xóa phòng',
-                message:     `Xóa phòng "${r.name}" (${r.branch_name || ''})?`,
-                type:        'danger',
-                confirmText: 'Xóa',
-            });
-            if (!ok) return;
-            const data = await apiRequest('/api/school-management/rooms/' + r.uuid, { method: 'DELETE' });
-            if (data?.status === 'success') {
-                showToast('success', 'Đã xóa phòng.');
-                this.rooms = this.rooms.filter(x => x.uuid !== r.uuid);
-            } else {
-                showToast('error', data?.message || 'Có lỗi xảy ra.');
+            try {
+                const data = await apiRequest('/api/school-management/academic-years/' + y.uuid, { method: 'DELETE' });
+                if (data?.status === 'success') {
+                    showToast('success', 'Đã xóa năm học.');
+                    this.years = this.years.filter(x => x.uuid !== y.uuid);
+                    this.applyFilter();
+                } else {
+                    showToast('error', data?.message || 'Có lỗi xảy ra.');
+                }
+            } catch (e) {
+                showToast('error', 'Không thể kết nối API.');
             }
         },
     };

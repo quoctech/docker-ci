@@ -47,11 +47,13 @@ foreach ($rawItems as $candidate) {
 }
 
 /**
- * Tính x-show Alpine.js cho một sidebar item dựa trên allowed_roles.
+ * Tính x-show Alpine.js cho một sidebar item dựa trên allowed_roles + min_perm.
  */
 function sidebarItemXshow(object $item): string
 {
-    $roles = $item->roles_arr;
+    $roles    = $item->roles_arr;
+    $module   = esc($item->module_slug, 'attr');
+    $minPerm  = $item->min_perm ?? null; // null|'read'|'write'|'edit'|'delete'
 
     // Item chỉ dành cho role='user' (học sinh): chỉ hiện cho student
     if (in_array('user', $roles) && ! in_array('super_admin', $roles) && ! in_array('workspace_admin', $roles)) {
@@ -60,13 +62,20 @@ function sidebarItemXshow(object $item): string
         //   không cần shortcut "Danh sách lớp học của tôi" nữa).
         // → HIỆN khi student CHƯA có quyền gì trên module (cần shortcut này để xem lớp).
         if ($item->url === '/admin/my-classrooms') {
-            return "user && user.role === 'user' && !hasModule('" . esc($item->module_slug, 'attr') . "')";
+            return "user && user.role === 'user' && !hasModule('{$module}')";
         }
-        return "user && user.role === 'user' && hasModule('" . esc($item->module_slug, 'attr') . "')";
+        return "user && user.role === 'user' && hasModule('{$module}')";
     }
 
-    // Item cho admin/workspace_admin/super_admin: check permission (hasModule)
-    return "user && hasModule('" . esc($item->module_slug, 'attr') . "')";
+    // Item cho admin/workspace_admin/super_admin.
+    // Nếu có min_perm = write|edit|delete → phải có quyền tương ứng mới hiện
+    // (dùng để ẩn các màn "chỉ-đọc" với user có quyền read-only).
+    if ($minPerm && $minPerm !== 'read') {
+        return "user && hasModulePerm('{$module}', 'can_{$minPerm}')";
+    }
+
+    // Default: chỉ cần hasModule (read)
+    return "user && hasModule('{$module}')";
 }
 
 /**

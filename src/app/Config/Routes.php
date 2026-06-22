@@ -38,6 +38,7 @@ $routes->group('admin', ['namespace' => '', 'filter' => 'module_redirect:school-
     $routes->get('school-management/branches',             '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branches');
     $routes->get('school-management/branches/(:segment)',  '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::branchDetail/$1');
     $routes->get('school-management/rooms',                '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::rooms');
+    $routes->get('school-management/academic-years',       '\Modules\SchoolManagement\Controllers\SchoolManagementPageController::academicYears');
 });
 
 // Role Management module — page routes
@@ -184,6 +185,13 @@ $routes->group('api', ['namespace' => ''], function ($routes) {
             $routes->get('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::show/$1');
             $routes->put('rooms/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminRoomController::update/$1');
             $routes->delete('rooms/(:segment)', '\Modules\SchoolManagement\Controllers\AdminRoomController::delete/$1');
+
+            // Academic Years - Quản lý năm học
+            $routes->get('academic-years',             '\Modules\SchoolManagement\Controllers\AdminAcademicYearController::index');
+            $routes->post('academic-years',            '\Modules\SchoolManagement\Controllers\AdminAcademicYearController::create');
+            $routes->get('academic-years/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminAcademicYearController::show/$1');
+            $routes->put('academic-years/(:segment)',  '\Modules\SchoolManagement\Controllers\AdminAcademicYearController::update/$1');
+            $routes->delete('academic-years/(:segment)', '\Modules\SchoolManagement\Controllers\AdminAcademicYearController::delete/$1');
         });
 
         // Role Management — Roles CRUD + apply to user

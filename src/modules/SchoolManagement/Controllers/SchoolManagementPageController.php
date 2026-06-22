@@ -25,4 +25,9 @@ class SchoolManagementPageController extends BaseController
     {
         return view('Modules\SchoolManagement\Views\centers/index');
     }
+
+    public function academicYears(): string
+    {
+        return view('Modules\SchoolManagement\Views\academic_years/index');
+    }
 }
